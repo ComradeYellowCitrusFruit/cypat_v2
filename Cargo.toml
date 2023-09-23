@@ -2,7 +2,7 @@
 name = "cypat_scoring_engine"
 version = "0.1.0"
 authors = ["Teresa Maria Rivera"]
-description = "A cyberpatriots scoring engine, or rather scoring library"
+description = "A CyberPatriots scoring engine library"
 repository = "https://github.com/ComradeYellowCitrusFruit/cypat_v2"
 keywords = ["cypat", "cyberpatriots"]
 license = "GPL-3.0-only"
@@ -17,3 +17,6 @@ crate-type = ["lib"]
 
 [dependencies]
 lazy_static = "1.4.0"
+
+[features]
+ignore_poisoning = []
