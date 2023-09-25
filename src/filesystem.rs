@@ -9,9 +9,10 @@ use digest::Output;
 use std::{
 	string::String, 
 	fs::File, 
-	io::BufReader,
+	io::{BufReader, Read},
 	sync::Mutex, 
-	collections::BTreeMap
+	collections::BTreeMap,
+	ptr::{null_mut, null},
 };
 use lazy_static::lazy_static;
 
@@ -33,7 +34,7 @@ pub struct Number {
 	numero: _Number,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Value {
     Null,
     Bool(bool),
@@ -56,51 +57,56 @@ pub fn register_db_file(name: &String) {
 	}
 }
 
-#[cfg(json_data)]
-fn get_named_data_yaml(name: &str) -> Value {
+fn get_named_data_json(name: &str) -> Value {
+	use serde_json::Value as JsonValue;
+
 	match (*DATA_DB_FILES).lock() {
 		Ok(mut g) => {
-			let ret: Value;
-			for &i in *g {
+			let mut ret: JsonValue = JsonValue::Null;
+			for i in &*g {
 				let mut f = match File::open(i.as_str()) {
-					Result(file) => file,
-					Err => panic!("Can't open data file {}", name),
+					Ok(file) => file,
+					Err(_) => panic!("Can't open data file {}", name),
 				};
-				let v: BTreeMap<&str, serde_yaml::Value> = match serde_yaml::from_reader(BufReader::new(f)) {
-					Result(yaml) => yaml,
-					Err => continue,
+				let v: JsonValue = match serde_json::from_reader(BufReader::new(f)).ok() {
+					Some(v) => v,
+					None => continue,
 				};
 
 				match v.get(name) {
 					Some(val) => {
-						ret = val;
+						ret = val.clone();
 						break;
 					},
-					None => ret = Value::Null,
+					None => ret = JsonValue::Null,
 				}
 			}
+
+			Value::from_serde_json_value(ret)
 		},
-		Err => todo!(),
+		Err(_) => todo!(),
 	}
 }
 
-#[cfg(yaml_data)]
-fn get_named_data_json(name: &str) -> Value {
+fn get_named_data_yaml(name: &str) -> Value {
 	use serde_yaml::Value as YamlValue;
 
 	match (*DATA_DB_FILES).lock() {
 		Ok(mut g) => {
-			let ret: JsonValue;
-			for &i in *g {
-				let mut f = match File::open(i.as_str()) {
-					Result(file) => file,
-					Err => panic!("Can't open data file {}", name),
+			let mut ret: YamlValue = YamlValue::Null;
+			for i in &*g {
+				let f = match File::open(i.as_str()) {
+					Ok(file) => file,
+					Err(_) => panic!("Can't open data file {}", name),
 				};
-				let v = serde_json::from_reader(BufReader::new(f));
+				let v: YamlValue = match serde_yaml::from_reader(BufReader::new(f)) {
+					Ok(yaml) => yaml,
+					Err(_) => continue,
+				};
 
 				match v.get(name) {
 					Some(val) => {
-						ret = val;
+						ret = val.clone();
 						break;
 					},
 					None => ret = YamlValue::Null,
@@ -109,62 +115,119 @@ fn get_named_data_json(name: &str) -> Value {
 
 			Value::from_serde_yaml_value(ret)
 		},
-		Err => todo!(),
+		Err(_) => todo!(),
+	}
+}
+
+fn get_named_data_toml(name: &str) -> Value {
+	use toml::Value as TomlValue;
+	use toml::Table;
+
+	match (*DATA_DB_FILES).lock() {
+		Ok(mut g) => {
+			// Null sentinel, TODO: new solution
+			let mut ret: TomlValue = unsafe { TomlValue::String(String::from_raw_parts(null_mut(), 0, 0)) };
+			for i in &*g {
+				let mut f = match File::open(i.as_str()) {
+					Ok(file) => file,
+					Err(_) => panic!("Can't open data file {}", name),
+				};
+
+				let mut string = String::new();
+				f.read_to_string(&mut string);
+
+				let v: Table = match toml::from_str(string.as_str()) {
+					Ok(toml) => toml,
+					Err(_) =>continue,
+				};
+
+				match v.get(name) {
+					Some(val) => {
+						ret = val.clone();
+						break;
+					},
+					None => continue,
+				}
+			}
+
+			Value::from_serde_toml_value(ret)
+		},
+		Err(_) => todo!(),
 	}
 }
 
 // TODO: mas
 pub fn get_named_data(name: &str) -> Value {
-	#[cfg(json_data)]
-	{
-		let r = get_named_data_json(name);
+	let mut r = get_named_data_json(name);
 
-		if r != Null {
-			return r;
-		}
+	if r != Value::Null {
+		return r;
 	}
 
-	#[cfg(yaml_data)]
-	{
-		let r = get_named_data_yaml(name);
+	r = get_named_data_yaml(name);
 
-		if r != Null {
-			return r;
-		}
+	if r != Value::Null {
+		return r;
+	}
+
+	r = get_named_data_toml(name);
+
+	if r != Value::Null {
+		return r;
 	}
 
 	Value::Null
 }
 
+impl PartialEq for Number {
+	fn eq(&self, other: &Self) -> bool {
+        if self.typo == other.typo {
+			if self.typo {
+				unsafe { self.numero.integer == other.numero.integer }
+			} else {
+				unsafe { self.numero.float == other.numero.float }
+			}
+		} else {
+			false
+		}
+    }
+}
+
+impl Eq for Number {}
+
 impl Number {
-	#[cfg(json_data)]
 	fn from_json_number(n: serde_json::Number) -> Self {
-		let a = Number { typo: true, numero: _Number { integer: 0 } };
+		let mut a = Number { typo: true, numero: _Number { integer: 0 } };
 		if n.is_i64() {
-			unsafe { a.numero.integer = n.as_i64() }
+			unsafe { a.numero.integer = n.as_i64().unwrap() as u64 }
 		} else if n.is_u64() {
-			unsafe { a.numero.integer = n.as_u64() }
+			unsafe { a.numero.integer = n.as_u64().unwrap() }
 		} else {
 			a.typo = false;
-			unsafe { a.numero.float = n.as_f64() }
+			unsafe { a.numero.float = n.as_f64().unwrap() }
 		}
 
 		a
 	}
-
-	#[cfg(yaml_data)]
 	fn from_yaml_number(n: serde_yaml::Number) -> Self {
-		let a = Number { typo: true, numero: _Number { integer: 0 } };
+		let mut a = Number { typo: true, numero: _Number { integer: 0 } };
 		if n.is_i64() {
-			unsafe { a.numero.integer = n.as_i64() }
+			unsafe { a.numero.integer = n.as_i64().unwrap() as u64 }
 		} else if n.is_u64() {
-			unsafe { a.numero.integer = n.as_u64() }
+			unsafe { a.numero.integer = n.as_u64().unwrap() }
 		} else {
 			a.typo = false;
-			unsafe { a.numero.float = n.as_f64() }
+			unsafe { a.numero.float = n.as_f64().unwrap() }
 		}
 
 		a
+	}
+	fn from_toml_number(n: toml::Value) -> Self {
+		match n {
+			toml::Value::Integer(i) => Number { typo: true, numero: _Number { integer: i as u64 } },
+			toml::Value::Float(f) => Number { typo: false, numero: _Number { float: f } },
+			_ => Number { typo: false, numero: _Number { float: f64::NAN } },
+		}
 	}
 
 	pub fn is_int(&self) -> bool {
@@ -217,62 +280,85 @@ impl Number {
 }
 
 impl Value {
-	#[cfg(json_data)]
 	fn from_serde_json_value(v: serde_json::Value) -> Self {
 		match v {
-			Null => Null,
-			Bool(b) => Bool(b),
-			Number(numero) => Number::from_json_number(numero),
-			String(string) => String(string),
-			Array(v) => {
-				let vector = Vec::with_capacity(v.len());
+			serde_json::Value::Null => Self::Null,
+			serde_json::Value::Bool(b) => Self::Bool(b),
+			serde_json::Value::Number(numero) => Self::Number(Number::from_json_number(numero)),
+			serde_json::Value::String(string) => Self::String(string),
+			serde_json::Value::Array(v) => {
+				let mut vector = Vec::with_capacity(v.len());
 
 				for i in v {
-					vector.push(from_serde_json_value(i));
+					vector.push(Self::from_serde_json_value(i));
 				}
 
-				Array(vector)
+				Self::Array(vector)
 			},
-			Object(m) => {
-				let map = BTreeMap::new();
+			serde_json::Value::Object(m) => {
+				let mut map = BTreeMap::new();
 
-				for i in m.into_inner() {
-					map.insert(i.0.clone(), from_serde_json_value(i.1.clone()));
+				for i in m.into_iter() {
+					map.insert(i.0.clone(), Self::from_serde_json_value(i.1.clone()));
 				}
 
-				Object(map)
+				Self::Object(map)
 			},
 		}	
 	}
 
-	#[cfg(yaml_data)]
 	fn from_serde_yaml_value(v: serde_yaml::Value) -> Self {
 		match v {
-			Null => Null,
-			Bool(b) => Bool(b),
-			Number(numero) => Number::from_yaml_number(numero),
-			String(string) => String(string),
-			Sequence(v) => {
-				let vector = Vec::with_capacity(v.len());
+			serde_yaml::Value::Null => Self::Null,
+			serde_yaml::Value::Bool(b) => Self::Bool(b),
+			serde_yaml::Value::Number(numero) => Self::Number(Number::from_yaml_number(numero)),
+			serde_yaml::Value::String(string) => Self::String(string),
+			serde_yaml::Value::Sequence(v) => {
+				let mut vector = Vec::with_capacity(v.len());
 
 				for i in v {
-					vector.push(from_serde_json_value(i));
+					vector.push(Self::from_serde_yaml_value(i));
 				}
 
-				Array(vector)
+				Self::Array(vector)
 			},
-			Mapping(m) => {
-				let map = BTreeMap::new();
+			serde_yaml::Value::Mapping(m) => todo!(),
+			serde_yaml::Value::Tagged(b) => {
+				Self::from_serde_yaml_value((*b).value)
+			},
+		}
+	}
 
-				for i in m.into_inner() {
-					map.insert(i.0.clone(), from_serde_json_value(i.1.clone()));
+	fn from_serde_toml_value(v: toml::Value) -> Self {
+		match v {
+			toml::Value::Boolean(b) => Self::Bool(b),
+			toml::Value::Integer(_) | toml::Value::Float(_) => Self::Number(Number::from_toml_number(v)),
+			toml::Value::String(string) => {
+				if string.as_bytes().as_ptr() != null() {
+					Self::Null
+				} else {
+					Self::String(string)
+				}
+			},
+			toml::Value::Array(v) => {
+				let mut vector = Vec::with_capacity(v.len());
+
+				for i in v {
+					vector.push(Self::from_serde_toml_value(i));
 				}
 
-				Object(map)
+				Self::Array(vector)
 			},
-			TaggedValue(b) => {
-				from_serde_yaml_value(*b.value)
+			toml::Value::Table(t) => {
+				let mut map = BTreeMap::new();
+
+				for i in t.into_iter() {
+					map.insert(i.0.clone(), Self::from_serde_toml_value(i.1.clone()));
+				}
+
+				Self::Object(map)
 			},
-		}	
+			toml::Value::Datetime(d) => Self::String(format!("{}", d)),
+		}
 	}
 }

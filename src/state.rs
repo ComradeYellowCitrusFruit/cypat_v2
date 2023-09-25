@@ -55,12 +55,12 @@ lazy_static! {
 pub fn add_score(add: i32, reason: String) {
     match (*SCORE).lock() {
         Ok(mut g) => (*g).push((add, reason)),
-        Err(g) => panic!("{}", g)
+        Err(g) => panic!("{}", g),
     }
 }
 
 pub fn sub_score(sub: i32, reason: String) {
-    add_score(sub * -1, reason)
+    add_score(-sub, reason)
 }
 
 pub(crate) fn add_vuln(vuln: ConditionData) {
