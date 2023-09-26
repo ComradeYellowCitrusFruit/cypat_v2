@@ -6,3 +6,4 @@
 
 pub(crate) mod state; // Isolate the internals of the state off to it's own private corner of hell
 pub mod filesystem;
+pub mod scorer;

@@ -151,8 +151,7 @@ fn get_named_data_toml(name: &str) -> Value {
     }
 }
 
-// TODO: mas
-pub fn get_named_data(name: &str) -> Value {
+pub fn get_database_entry(name: &str) -> Value {
     let mut r = get_named_data_json(name);
 
     if r != Value::Null {

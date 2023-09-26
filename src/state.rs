@@ -45,20 +45,46 @@ pub(crate) enum ConditionData {
 }
 
 lazy_static! {
-    static ref SCORE: Mutex<Vec<(i32, String)>> = Mutex::new(Vec::with_capacity(32));
+    static ref SCORE: Mutex<Vec<(u64, i32, String)>> = Mutex::new(Vec::with_capacity(32));
     static ref VULNS: Mutex<Vec<(ConditionData, bool)>> = Mutex::new(Vec::with_capacity(32));
     static ref START_TIME: Instant = Instant::now();
 }
 
-pub fn add_score(add: i32, reason: String) {
+pub fn add_score(id: u64, add: i32, reason: String) {
     match (*SCORE).lock() {
-        Ok(mut g) => (*g).push((add, reason)),
+        Ok(mut g) => (*g).push((id, add, reason)),
         Err(g) => panic!("{}", g),
     }
 }
 
-pub fn sub_score(sub: i32, reason: String) {
-    add_score(-sub, reason)
+pub fn remove_score(id: u64) -> Result<(), ()> {
+    match (*SCORE).lock() {
+        Ok(mut g) => {
+            for (idx, (id_of_val, _, _)) in (*g).clone().into_iter().enumerate() {
+                if id_of_val == id {
+                    (*g).remove(idx);
+                    return Ok(());
+                }
+            }
+            Err(())
+        },
+        Err(g) => panic!("{}", g),
+    }
+}
+
+pub fn generate_score_report() -> Vec<(String, i32)> {
+    match (*SCORE).lock() {
+        Ok(g) => {
+            let mut report = Vec::with_capacity((*g).len());
+
+            for (_, value, reason) in g.iter() {
+                report.push((reason.clone(), *value));
+            }
+
+            report
+        },
+        Err(g) => panic!("{}", g),
+    }
 }
 
 pub(crate) fn add_vuln(vuln: ConditionData) {
