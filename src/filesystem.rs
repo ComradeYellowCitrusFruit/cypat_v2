@@ -3,9 +3,6 @@
 *   A cyberpatriots scoring engine library
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
-use crate::state::{add_vuln, ConditionData::*, add_score, FileData};
-use sha2::{Sha256, Digest};
-use digest::Output;
 use std::{
     string::String, 
     fs::File, 
@@ -15,8 +12,6 @@ use std::{
     ptr::{null_mut, null},
 };
 use lazy_static::lazy_static;
-
-pub type FileHash = Output<Sha256>;
 
 lazy_static! {
     static ref DATA_DB_FILES: Mutex<Vec<String>> = Mutex::new(Vec::with_capacity(32));

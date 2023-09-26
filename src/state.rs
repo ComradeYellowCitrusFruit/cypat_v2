@@ -6,10 +6,8 @@
 
 use lazy_static::lazy_static;
 use std::{
-    sync::{Mutex, PoisonError, MutexGuard, atomic::AtomicI64},
+    sync::Mutex,
     fs::File,
-    mem::ManuallyDrop,
-    collections::BTreeMap,
     time::Instant,
 };
 
