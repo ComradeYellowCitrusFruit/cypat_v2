@@ -8,14 +8,14 @@ use std::{fs::File, string::String, str::FromStr};
 
 pub fn add_file_vuln<F>(name: &str, f: F)
 where 
-    F: FnMut(Option<File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
+    F: FnMut(Option<&File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
 {
     let fd = FileData {
         name: String::from_str(name).ok().unwrap(),
         position: 0,
     };
 
-    add_vuln(ConditionData::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<File>) -> bool + Send + Sync>));
+    add_vuln(ConditionData::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<&File>) -> bool + Send + Sync>));
 }
 
 pub fn add_appbased_vuln<F>(name: &str, install_method: InstallMethod, f: F)

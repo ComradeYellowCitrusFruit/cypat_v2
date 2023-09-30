@@ -8,7 +8,9 @@ use lazy_static::lazy_static;
 use std::{
     sync::Mutex,
     fs::File,
-    time::Instant,
+    time::{Instant, Duration},
+    io::{SeekFrom, Seek},
+    thread::sleep,
 };
 
 #[derive(Clone, Copy)]
@@ -29,8 +31,8 @@ pub(crate) struct FileData {
 
 #[derive(Clone)]
 pub struct AppData {
-    pub(crate) install_method: AppInstallMethod,
-    pub(crate) name: String,
+    pub install_method: AppInstallMethod,
+    pub name: String,
 }
 
 #[derive(Clone)]
@@ -39,7 +41,7 @@ pub(crate) struct UserData {
 }
 
 pub(crate) enum ConditionData {
-    FileVuln(FileData, Box<dyn FnMut(Option<File>) -> bool + Send + Sync>),
+    FileVuln(FileData, Box<dyn FnMut(Option<&File>) -> bool + Send + Sync>),
     AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
     UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
     CustomVuln(Box<dyn FnMut(()) -> bool + Send + Sync>),
@@ -95,14 +97,60 @@ pub(crate) fn add_vuln(vuln: ConditionData) {
     }
 }
 
+fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
+    match &mut vuln.0 {
+        ConditionData::FileVuln(d, f) => {
+            let pf = File::open(d.name.clone()).ok();
+
+            match pf {
+                Some(mut file) => {
+                    let _ = file.seek(SeekFrom::Start(d.position));
+                    vuln.1 = f(Some(&file));
+                    d.position = file.stream_position().ok().unwrap();
+                },
+                None => {
+                    vuln.1 = f(None);
+                },
+            }
+        },
+        ConditionData::AppVuln(a, f) => {
+            vuln.1 = f(a.clone());
+        },
+        ConditionData::UserVuln(u, f) => {
+            vuln.1 = f(u.name.as_str());
+        },
+        ConditionData::CustomVuln(f) => {
+            vuln.1 = f(());
+        },
+    }
+}
+
+pub fn update_engine(cur_iter: i32) -> () {
+    match (*VULNS).lock() {
+        Ok(mut g) => {
+            for vuln in (*g).iter_mut() {
+                if cur_iter % 5 == 0 && vuln.1 {
+                    handle_vulnerability(vuln);
+                } else {
+                    handle_vulnerability(vuln);
+                }
+            }
+        },
+        Err(g) => panic!("{}",g)
+    }
+}
+
 #[cfg(RUSTC_IS_NIGHTLY)]
 #[feature(never_type)]
 pub fn enter_engine() -> ! {
     let mut iterations = 0;
     // TODO: init
-
+    
     loop {
+        update_engine(iterations);
+        iterations += 1;
 
+        sleep(Duration::from_secs(1));
     }
 }
 
@@ -112,17 +160,9 @@ pub fn enter_engine() -> () {
     // TODO: init
     
     loop {
-        match (*VULNS).lock() {
-            Ok(mut g) => {
-                for vuln in (*g).iter_mut() {
-                    if iterations % 5 == 0 && vuln.1 {
-                        match vuln.0 {
-                            _ => todo!(),
-                        }
-                    }
-                }
-            },
-            Err(g) => panic!("{}",g)
-        }
+        update_engine(iterations);
+        iterations += 1;
+
+        sleep(Duration::from_secs(1));
     }
 }
