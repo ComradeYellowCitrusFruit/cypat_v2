@@ -15,6 +15,9 @@ name = "cypat"
 path = "src/lib.rs"
 crate-type = ["lib"]
 
+[build-dependencies]
+rustc_version = "0.4"
+
 [dependencies]
 lazy_static = "1.4"
 generic-array = "1"

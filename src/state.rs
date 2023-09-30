@@ -21,27 +21,28 @@ pub enum AppInstallMethod {
     ManualInstall,
 }
 
+#[derive(Clone)]
 pub(crate) struct FileData {
-    pub(crate) name: &'static str,
+    pub(crate) name: String,
     pub(crate) position: u64
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct AppData {
     pub(crate) install_method: AppInstallMethod,
-    pub(crate) name: &'static str,
+    pub(crate) name: String,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct UserData {
-    pub(crate) name: &'static str,
+    pub(crate) name: String,
 }
 
 pub(crate) enum ConditionData {
-    FileVuln(FileData, Box<dyn FnMut(Option<File>) -> () + Send + Sync>),
-    AppVuln(AppData, Box<dyn FnMut(AppData) -> () + Send + Sync>),
-    UserVuln(UserData, Box<dyn FnMut(&str) -> () + Send + Sync>),
-    CustomVuln(Box<dyn FnMut(()) -> () + Send + Sync>),
+    FileVuln(FileData, Box<dyn FnMut(Option<File>) -> bool + Send + Sync>),
+    AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
+    UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
+    CustomVuln(Box<dyn FnMut(()) -> bool + Send + Sync>),
 }
 
 lazy_static! {
@@ -91,5 +92,37 @@ pub(crate) fn add_vuln(vuln: ConditionData) {
     match (*VULNS).lock() {
         Ok(mut g) => g.push((vuln, false)),
         Err(g) => panic!("{}", g),
+    }
+}
+
+#[cfg(RUSTC_IS_NIGHTLY)]
+#[feature(never_type)]
+pub fn enter_engine() -> ! {
+    let mut iterations = 0;
+    // TODO: init
+
+    loop {
+
+    }
+}
+
+#[cfg(not(RUSTC_IS_NIGHTLY))]
+pub fn enter_engine() -> () {
+    let mut iterations = 0;
+    // TODO: init
+    
+    loop {
+        match (*VULNS).lock() {
+            Ok(mut g) => {
+                for vuln in (*g).iter_mut() {
+                    if iterations % 5 == 0 && vuln.1 {
+                        match vuln.0 {
+                            _ => todo!(),
+                        }
+                    }
+                }
+            },
+            Err(g) => panic!("{}",g)
+        }
     }
 }
