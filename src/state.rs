@@ -106,7 +106,7 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
                 Some(mut file) => {
                     let _ = file.seek(SeekFrom::Start(d.position));
                     vuln.1 = f(Some(&file));
-                    d.position = file.stream_position().ok().unwrap();
+                    d.position = file.stream_position().unwrap();
                 },
                 None => {
                     vuln.1 = f(None);
