@@ -144,7 +144,8 @@ pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
 		match cmd.ok() {
 			Some(o) => {
 				let tmp = String::from_utf8_lossy(&o.stdout);
-				if tmp.contains(gname) {
+                
+	    		if tmp.contains(gname) {
 					Ok(tmp.contains(uname))
 				} else {
 					Err(())
