@@ -17,8 +17,11 @@ use std::{
 pub enum AppInstallMethod {
     Default,
     SystemPackageManager,
+    #[cfg(target_os = "windows")]
     WinGet,
+    #[cfg(target_os = "linux")]
     Snap,
+    #[cfg(target_os = "linux")]
     Flatpak,
     ManualInstall,
 }
