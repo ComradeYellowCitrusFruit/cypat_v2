@@ -1,8 +1,8 @@
 # Cyberpatriots Scoring Engine
 
-A cyberpatriots scoring engine, or rather scoring library.
-This is attempt #2 for me, and unlike the last time, I'm gonna keep this simple.
-It's going to be a Rust library.
+A cyberpatriots scoring engine library.
+This library aims to make it simple to make scoring engines for custom Cyberpatriots practice images.
+I made this primarily for myself, however if other people can use it for their own purposes, good for them.
 
 ## Copyright Disclaimer
 A cyberpatriots scoring engine, or rather scoring library
