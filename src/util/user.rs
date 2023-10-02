@@ -3,6 +3,8 @@
 *   A cyberpatriots scoring engine library
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
+#![allow(unused_imports)]
+
 use std::{
 	vec::Vec, 
 	string::String, 
@@ -17,6 +19,19 @@ use std::{
 pub struct GroupEntry {
 	pub groupname: String,
 	pub gid: u64,
+	pub list: Vec<String>,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Clone)]
+pub struct PasswdEntry {
+	pub username: String,
+    pub password_in_shadow: bool,
+    pub uid: u64,
+	pub gid: u64,
+    pub gecos: String,
+    pub home_dir: String,
+    pub shell: String,
 	pub list: Vec<String>,
 }
 
@@ -63,8 +78,38 @@ pub fn user_exists(name: &str) -> bool {
 	}
 	#[cfg(target_os = "windows")]
 	{
-		let cmd = Command::new("wmic")
-        .args(&["useraccount", "where", &format!("Name='{}'", name)])
+		let cmd = Command::new("net")
+        .args(&["user", &format!("{}", name)])
+		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
+		match cmd.ok() {
+			Some(o) => String::from_utf8_lossy(&o.stdout).contains(name),
+			None => false,
+		}
+	}
+}
+
+pub fn group_exists(name: &str) -> bool {
+	#[cfg(target_os = "linux")]
+	{
+		let reader = BufReader::new(File::open("/etc/group"));
+
+		for i in reader.lines().map(|l| l.ok()) {
+			match i {
+				Some(line) => {
+                    if line.contains(gname) {
+                        return true;
+                    } else {
+                        continue;
+                    }
+                },
+				None() => return false,
+			}
+		}
+	}
+	#[cfg(target_os = "windows")]
+	{
+		let cmd = Command::new("net")
+        .args(&["localgroup", &format!("{}", name)])
 		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
 		match cmd.ok() {
 			Some(o) => String::from_utf8_lossy(&o.stdout).contains(name),
@@ -93,7 +138,43 @@ pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
 	}
 	#[cfg(target_os = "windows")]
 	{
-        // TODO: this
-        todo!()
+        let cmd = Command::new("net")
+        .args(&["localgroup", &format!("{}", gname)])
+		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
+		match cmd.ok() {
+			Some(o) => {
+				let tmp = String::from_utf8_lossy(&o.stdout);
+				if tmp.contains(gname) {
+					Ok(tmp.contains(uname))
+				} else {
+					Err(())
+				}
+			},
+			None => Err(()),
+		}
 	}
+}
+
+pub fn user_is_admin(name: &str) -> Result<bool, ()> {
+    #[cfg(target_os = "linux")]
+    {
+        if name == "root" {
+            Ok(true)
+        } else {
+            if user_exists(name) {
+                let cmd = Command::new("net")
+                    .args(&["-l", "-U", &format!("{}", name)]).stderr(Stdio::null()).stdout(Stdio::piped())
+		            .output().expect("¿Por qué sudo no esta trabajando?");
+                let mensaje = format!("User {} is not allowed to run sudo", name);
+
+                Ok(!String::from_utf8_lossy(&cmd.stdout).contains(&mensaje))
+            } else {
+                Err(())
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        user_is_in_group(name, "Administrators")
+    }
 }

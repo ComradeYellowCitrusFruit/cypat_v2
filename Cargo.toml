@@ -19,7 +19,6 @@ crate-type = ["lib"]
 rustc_version = "0.4"
 
 [dependencies]
-winapi = { version = "0.3", features = ["um", "winbase"] }
 lazy_static = "1.4"
 generic-array = "1"
 sha2 = "0.10"
