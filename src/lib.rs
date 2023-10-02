@@ -9,3 +9,4 @@ pub mod filesystem;
 pub mod scorer;
 pub mod engine;
 pub mod util;
+pub mod settings;

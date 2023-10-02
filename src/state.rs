@@ -6,7 +6,7 @@
 
 use lazy_static::lazy_static;
 use std::{
-    sync::Mutex,
+    sync::{Mutex, atomic::{AtomicU64, Ordering}},
     fs::File,
     time::{Instant, Duration},
     io::{SeekFrom, Seek},
@@ -54,6 +54,8 @@ lazy_static! {
     static ref SCORE: Mutex<Vec<(u64, i32, String)>> = Mutex::new(Vec::with_capacity(32));
     static ref VULNS: Mutex<Vec<(ConditionData, bool)>> = Mutex::new(Vec::with_capacity(32));
     static ref START_TIME: Instant = Instant::now();
+    static ref INCOMPLETE_FREQ: AtomicU64 = AtomicU64::new(1);
+    static ref COMPLETE_FREQ: AtomicU64 = AtomicU64::new(5);
 }
 
 pub fn add_score(id: u64, add: i32, reason: String) {
@@ -93,6 +95,14 @@ pub fn generate_score_report() -> Vec<(String, i32)> {
     }
 }
 
+pub fn set_update_freq(frequency: u64) {
+    (*INCOMPLETE_FREQ).store(frequency, Ordering::SeqCst);
+}
+
+pub fn set_completed_update_freq(frequency: u64) {
+    (*COMPLETE_FREQ).store(frequency, Ordering::SeqCst);
+}
+
 pub(crate) fn add_vuln(vuln: ConditionData) {
     match (*VULNS).lock() {
         Ok(mut g) => g.push((vuln, false)),
@@ -128,11 +138,11 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
     }
 }
 
-pub fn update_engine(cur_iter: i32) -> () {
+pub fn update_engine(cur_iter: u64) -> () {
     match (*VULNS).lock() {
         Ok(mut g) => {
             for vuln in (*g).iter_mut() {
-                if cur_iter % 5 == 0 && vuln.1 {
+                if cur_iter % (*COMPLETE_FREQ).load(Ordering::SeqCst) == 0 && vuln.1 {
                     handle_vulnerability(vuln);
                 } else {
                     handle_vulnerability(vuln);
@@ -153,7 +163,7 @@ pub fn enter_engine() -> ! {
         update_engine(iterations);
         iterations += 1;
 
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs((*INCOMPLETE_FREQ).load(Ordering::SeqCst)));
     }
 }
 
@@ -166,6 +176,6 @@ pub fn enter_engine() -> () {
         update_engine(iterations);
         iterations += 1;
 
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs((*INCOMPLETE_FREQ).load(Ordering::SeqCst)));
     }
 }
