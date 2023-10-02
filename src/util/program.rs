@@ -26,7 +26,7 @@ pub fn is_package_installed(name: &str) -> bool {
 					return true;
 				}
 			},
-			None() => (),
+			None => (),
 		}
 
 		match Command::new("snap").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
@@ -35,7 +35,7 @@ pub fn is_package_installed(name: &str) -> bool {
 					return true;
 				}
 			},
-			None() => (),
+			None => (),
 		}
 
 		false

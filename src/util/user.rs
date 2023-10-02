@@ -14,6 +14,7 @@ use std::{
 	process::{Command, Stdio},
 };
 
+
 #[cfg(target_os = "linux")]
 #[derive(Clone)]
 pub struct GroupEntry {
@@ -32,22 +33,22 @@ pub struct PasswdEntry {
     pub gecos: String,
     pub home_dir: String,
     pub shell: String,
-	pub list: Vec<String>,
 }
 
 #[cfg(target_os = "linux")]
 impl PasswdEntry {
 	pub fn parse_entry(entry: &str) -> PasswdEntry {
 		let tokenized_entry: Vec<&str> = entry.split(':').collect();
-		let entry: PasswdEntry;
-		entry.username = tokenized_entry[0];
-		entry.password_in_shadow = tokenized_entry[1] == "x";
-		entry.uid = tokenized_entry[2].parse::<u64>().unwrap();
-		entry.gid = tokenized_entry[3].parse::<u64>().unwrap();
-		entry.gecos = String::from_str(tokenized_entry[4]);
-		entry.home_dir = String::from_str(tokenized_entry[5]);
-		entry.shell = String::from_str(tokenized_entry[6]);
-		entry
+
+		PasswdEntry {
+			username: tokenized_entry[0].to_string(),
+			password_in_shadow: tokenized_entry[1] == "x",
+			uid: tokenized_entry[2].parse::<u64>().unwrap(),
+			gid: tokenized_entry[3].parse::<u64>().unwrap(),
+			gecos: tokenized_entry[4].to_string(),
+			home_dir: tokenized_entry[5].to_string(),
+			shell: tokenized_entry[6].to_string(),
+		}
 	}
 
 	pub fn find_and_parse_entry<T>(name: &str, reader: T) -> Option<PasswdEntry>
@@ -58,7 +59,7 @@ impl PasswdEntry {
 			match i {
 				Some(s) => {
 					if s.split(':').collect::<Vec<_>>()[0] == String::from_str(name).unwrap() {
-						return Some(Self::parse_entry(s));
+						return Some(Self::parse_entry(&s));
 					}
 				},
 				None => break,
@@ -73,8 +74,8 @@ pub fn user_exists(name: &str) -> bool {
 	#[cfg(target_os = "linux")]
 	{
 		// not quite what I'd like to do but that's fine
-		let reader = BufReader::new(File::open("/etc/passwd"));
-		find_and_parse_entry(name, reader).is_none()
+		let reader = BufReader::new(File::open("/etc/passwd").expect("Geniunely what the fuck?"));
+		PasswdEntry::find_and_parse_entry(name, reader).is_none()
 	}
 	#[cfg(target_os = "windows")]
 	{
@@ -91,20 +92,22 @@ pub fn user_exists(name: &str) -> bool {
 pub fn group_exists(name: &str) -> bool {
 	#[cfg(target_os = "linux")]
 	{
-		let reader = BufReader::new(File::open("/etc/group"));
+		let reader = BufReader::new(File::open("/etc/group").expect("Geniunely what the fuck?"));
 
 		for i in reader.lines().map(|l| l.ok()) {
 			match i {
 				Some(line) => {
-                    if line.contains(gname) {
+                    if line.contains(name) {
                         return true;
                     } else {
                         continue;
                     }
                 },
-				None() => return false,
+				None => return false,
 			}
 		}
+
+		false
 	}
 	#[cfg(target_os = "windows")]
 	{
@@ -121,7 +124,7 @@ pub fn group_exists(name: &str) -> bool {
 pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
 	#[cfg(target_os = "linux")]
 	{
-		let reader = BufReader::new(File::open("/etc/group"));
+		let reader = BufReader::new(File::open("/etc/group").expect("Genuinely what the fuck?"));
 
 		for i in reader.lines().map(|l| l.ok()) {
 			match i {
@@ -132,9 +135,11 @@ pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
                         continue;
                     }
                 },
-				None() => return Err(()),
+				None => return Err(()),
 			}
 		}
+		
+		Err(())
 	}
 	#[cfg(target_os = "windows")]
 	{
