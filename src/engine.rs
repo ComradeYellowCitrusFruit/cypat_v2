@@ -9,19 +9,27 @@ pub use crate::state::{
     AppData,
     AppInstallMethod as InstallMethod,
     enter_engine,
+    update_engine,
 };
 use std::{fs::File, string::String, str::FromStr};
 
+/// Register a file based vulnerability
+/// 
+/// Register a file based vulnerability.
+/// This takes the form of a function/closure that takes an `Option<&mut File>` as it's only parameter, and returns a bool.
+/// 
+/// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
+/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
 pub fn add_file_vuln<F>(name: &str, f: F)
 where 
-    F: FnMut(Option<&File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
+    F: FnMut(Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
 {
     let fd = FileData {
         name: String::from_str(name).unwrap(),
         position: 0,
     };
 
-    add_vuln(ConditionData::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<&File>) -> bool + Send + Sync>));
+    add_vuln(ConditionData::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>));
 }
 
 pub fn add_appbased_vuln<F>(name: &str, install_method: InstallMethod, f: F)

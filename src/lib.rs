@@ -4,6 +4,10 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
+//! A cyberpatriots scoring engine library
+//! 
+//! Provides a fairly simple interface for programming Cyberpatriots scoring engines for practice images.
+
 pub(crate) mod state; // Isolate the internals of the state off to it's own private corner of hell
 pub mod filesystem;
 pub mod scorer;

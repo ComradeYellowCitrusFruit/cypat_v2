@@ -23,12 +23,14 @@ union _Number {
     float: f64,
 }
 
+/// A number that can be any kind of integer or floating point number
 #[derive(Clone, Copy)]
 pub struct Number {
     typo: bool,
     numero: _Number,
 }
 
+/// Contains a value stored in a database entry
 #[derive(Clone, PartialEq, Eq)]
 pub enum Value {
     Null,
@@ -39,12 +41,18 @@ pub enum Value {
     Object(BTreeMap<String, Value>),
 }
 
-pub fn register_db_file(name: &String) {
+/// Registers a file to be used in database lookup.
+/// 
+/// Registers a file to the list of files to be used whenever we need to look up something from the database.
+pub fn register_db_file<S>(name: &S)
+where
+    S: ToString
+{
     match (*DATA_DB_FILES).lock() {
-        Ok(mut g) => g.push(name.clone()),
+        Ok(mut g) => g.push(name.to_string()),
         Err(g) => {
             if cfg!(ignore_poisoning) {
-                g.into_inner().push(name.clone());
+                g.into_inner().push(name.to_string());
             } else {
                 panic!("{}", g);
             }

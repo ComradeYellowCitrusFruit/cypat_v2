@@ -13,6 +13,7 @@ use std::{
     thread::sleep,
 };
 
+/// Contains package install information.
 #[derive(Clone, Copy)]
 pub enum AppInstallMethod {
     Default,
@@ -32,6 +33,10 @@ pub(crate) struct FileData {
     pub(crate) position: u64
 }
 
+/// Contains some simple data regarding applications or packages
+/// 
+/// Contains some basic information regarding applications or packages.
+/// Somewhat useful, particularly for looking up package information on Linux.
 #[derive(Clone)]
 pub struct AppData {
     pub install_method: AppInstallMethod,
@@ -44,7 +49,7 @@ pub(crate) struct UserData {
 }
 
 pub(crate) enum ConditionData {
-    FileVuln(FileData, Box<dyn FnMut(Option<&File>) -> bool + Send + Sync>),
+    FileVuln(FileData, Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>),
     AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
     UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
     CustomVuln(Box<dyn FnMut(()) -> bool + Send + Sync>),
@@ -58,6 +63,7 @@ lazy_static! {
     static ref COMPLETE_FREQ: AtomicU64 = AtomicU64::new(5);
 }
 
+/// Adds an entry to the score report, with an ID, a score value, and an explanation
 pub fn add_score(id: u64, add: i32, reason: String) {
     match (*SCORE).lock() {
         Ok(mut g) => (*g).push((id, add, reason)),
@@ -65,6 +71,7 @@ pub fn add_score(id: u64, add: i32, reason: String) {
     }
 }
 
+/// Removes the entry identifed
 pub fn remove_score(id: u64) -> Result<(), ()> {
     match (*SCORE).lock() {
         Ok(mut g) => {
@@ -80,6 +87,8 @@ pub fn remove_score(id: u64) -> Result<(), ()> {
     }
 }
 
+/// Generates a list of score entries
+/// Generates a vector containing the explaination and value of each score entry in order
 pub fn generate_score_report() -> Vec<(String, i32)> {
     match (*SCORE).lock() {
         Ok(g) => {
@@ -95,10 +104,21 @@ pub fn generate_score_report() -> Vec<(String, i32)> {
     }
 }
 
+/// Sets the frequency in seconds at which the engine is updated.
+/// 
+/// Sets the frequency in seconds at which [`engine::update_engine`] is called, if using [`engine::enter_engine`].
+/// 
+/// Internally this is handled as a variable called `INCOMPLETE_UPDATE_FREQ`
 pub fn set_update_freq(frequency: u64) {
     (*INCOMPLETE_FREQ).store(frequency, Ordering::SeqCst);
 }
 
+/// Sets the frequency in iterations of engine updates that completed vulnerabilities are reviewed.
+/// 
+/// Sets the frequency in iterations of engine updates that completed vulnerabilities are re-executed.
+/// This value is important even if you don't use [`engine::enter_engine`] because of the way it is interpreted by [`engine::update_engine`]
+/// 
+/// Internally this is handled as a variable called `COMPLETE_UPDATE_FREQ`
 pub fn set_completed_update_freq(frequency: u64) {
     (*COMPLETE_FREQ).store(frequency, Ordering::SeqCst);
 }
@@ -118,7 +138,7 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
             match pf {
                 Some(mut file) => {
                     let _ = file.seek(SeekFrom::Start(d.position));
-                    vuln.1 = f(Some(&file));
+                    vuln.1 = f(Some(&mut file));
                     d.position = file.stream_position().unwrap();
                 },
                 None => {
@@ -138,6 +158,10 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
     }
 }
 
+/// Executes vulnerabilites
+/// 
+/// Incomplete vulnerabilites are excuted each time the function is executed.
+/// Complete vulnerabilites are excuted only if `cur_iter` mod `COMPLETE_UPDATE_FREQ` is 0
 pub fn update_engine(cur_iter: u64) -> () {
     match (*VULNS).lock() {
         Ok(mut g) => {
@@ -155,6 +179,14 @@ pub fn update_engine(cur_iter: u64) -> () {
 
 #[cfg(RUSTC_IS_NIGHTLY)]
 #[feature(never_type)]
+/// Start engine execution on this thread
+/// 
+/// This enters an infinite loop that calls [`engine::update_engine`], 
+/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`engine::set_update_freq`]) seconds.
+/// The value of `cur_iter` passed to [`engine::update_engine`] is a variable incremented every time the loop is executed
+/// 
+/// This state of execution only takes control of one thread, and other threads can generally continue without issue,
+/// however new vulnerabilities cannot be added.
 pub fn enter_engine() -> ! {
     let mut iterations = 0;
     // TODO: init
@@ -168,6 +200,14 @@ pub fn enter_engine() -> ! {
 }
 
 #[cfg(not(RUSTC_IS_NIGHTLY))]
+/// Start engine execution on this thread
+/// 
+/// This enters an infinite loop that calls [`engine::update_engine`], 
+/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`engine::set_update_freq`]) seconds.
+/// The value of `cur_iter` passed to [`engine::update_engine`] is a variable incremented every time the loop is executed
+/// 
+/// This state of execution only takes control of one thread, and other threads can generally continue without issue,
+/// however new vulnerabilities cannot be added.
 pub fn enter_engine() -> () {
     let mut iterations = 0;
     // TODO: init
