@@ -9,10 +9,12 @@
 //! Provides a fairly simple interface for programming Cyberpatriots scoring engines for practice images.
 
 pub(crate) mod state; // Isolate the internals of the state off to it's own private corner of hell
-pub mod filesystem;
 pub mod scorer;
 pub mod engine;
 pub mod settings;
 
 #[cfg(feature = "utility")]
 pub mod util;
+
+#[cfg(feature = "database")]
+pub mod filesystem;

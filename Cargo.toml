@@ -20,16 +20,13 @@ rustc_version = "0.4"
 
 [dependencies]
 lazy_static = "1.4"
-generic-array = "1"
-sha2 = "0.10"
-digest = "0.10"
-serde = "1.0"
-serde_json = "1.0"
-serde_yaml = "0.9"
-toml = "0.8"
-envy = "0.4"
+serde = { version = "1.0", optional = true }
+serde_json = { version = "1.0", optional = true }
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.8", optional = true }
 
 [features]
 default = ["utility"]
 utility = []
+database = ["dep:serde", "dep:serde_json", "dep:serde_yaml", "dep:toml"]
 # sql_data = []

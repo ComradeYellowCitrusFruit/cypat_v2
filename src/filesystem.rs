@@ -3,6 +3,8 @@
 *   A cyberpatriots scoring engine library
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
+#![cfg(feature = "database")]
+
 use std::{
     string::String, 
     fs::File, 
