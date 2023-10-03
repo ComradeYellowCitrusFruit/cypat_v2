@@ -32,6 +32,13 @@ where
     add_vuln(ConditionData::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>));
 }
 
+/// Register a package/app based vulnerability
+/// 
+/// Register a package/app based vulnerability.
+/// This takes the form of a function/closure that takes an `AppData` as it's only parameter, and returns a bool.
+/// 
+/// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
+/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
 pub fn add_appbased_vuln<F>(name: &str, install_method: InstallMethod, f: F)
 where 
     F: FnMut(AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -44,6 +51,13 @@ where
     add_vuln(ConditionData::AppVuln(ad, Box::new(f) as Box<dyn FnMut(AppData) -> bool + Send + Sync>));
 }
 
+/// Register a user based vulnerability
+/// 
+/// Register a user based vulnerability.
+/// This takes the form of a function/closure that takes an `&str` as it's only parameter, and returns a bool.
+/// 
+/// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
+/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
 pub fn add_userbased_vuln<F>(name: &str, f: F)
 where 
     F: FnMut(&str) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -55,6 +69,13 @@ where
     add_vuln(ConditionData::UserVuln(ud, Box::new(f) as Box<dyn FnMut(&str) -> bool + Send + Sync>));
 }
 
+/// Register a miscellaneous vulnerability
+/// 
+/// Register a miscellaneous vulnerability.
+/// This takes the form of a function/closure that takes no parameters, and returns a bool.
+/// 
+/// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
+/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
 pub fn add_misc_vuln<F>(f: F)
 where
     F: FnMut(()) -> bool + Send + Sync + 'static,
