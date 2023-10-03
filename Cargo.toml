@@ -30,4 +30,6 @@ toml = "0.8"
 envy = "0.4"
 
 [features]
+default = ["utility"]
+utility = []
 # sql_data = []

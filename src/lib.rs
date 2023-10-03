@@ -12,5 +12,7 @@ pub(crate) mod state; // Isolate the internals of the state off to it's own priv
 pub mod filesystem;
 pub mod scorer;
 pub mod engine;
-pub mod util;
 pub mod settings;
+
+#[cfg(feature = "utility")]
+pub mod util;
