@@ -6,7 +6,7 @@
 
 use lazy_static::lazy_static;
 use std::{
-    sync::{Mutex, atomic::{AtomicU64, Ordering}},
+    sync::{Mutex, atomic::{AtomicU64, Ordering, AtomicBool}},
     fs::File,
     time::{Instant, Duration},
     io::{SeekFrom, Seek},
@@ -61,6 +61,7 @@ lazy_static! {
     static ref START_TIME: Instant = Instant::now();
     static ref INCOMPLETE_FREQ: AtomicU64 = AtomicU64::new(1);
     static ref COMPLETE_FREQ: AtomicU64 = AtomicU64::new(5);
+    static ref ENGINE_IS_RUNNING: AtomicBool = AtomicBool::new(true);
 }
 
 /// Adds an entry to the score report, with an ID, a score value, and an explanation
@@ -106,7 +107,7 @@ pub fn generate_score_report() -> Vec<(String, i32)> {
 
 /// Sets the frequency in seconds at which the engine is updated.
 /// 
-/// Sets the frequency in seconds at which [`engine::update_engine`] is called, if using [`engine::enter_engine`].
+/// Sets the frequency in seconds at which [`update_engine`] is called, if using [`enter_engine`].
 /// 
 /// Internally this is handled as a variable called `INCOMPLETE_UPDATE_FREQ`
 pub fn set_update_freq(frequency: u64) {
@@ -116,7 +117,7 @@ pub fn set_update_freq(frequency: u64) {
 /// Sets the frequency in iterations of engine updates that completed vulnerabilities are reviewed.
 /// 
 /// Sets the frequency in iterations of engine updates that completed vulnerabilities are re-executed.
-/// This value is important even if you don't use [`engine::enter_engine`] because of the way it is interpreted by [`engine::update_engine`]
+/// This value is important even if you don't use [`enter_engine`] because of the way it is interpreted by [`update_engine`]
 /// 
 /// Internally this is handled as a variable called `COMPLETE_UPDATE_FREQ`
 pub fn set_completed_update_freq(frequency: u64) {
@@ -177,21 +178,21 @@ pub fn update_engine(cur_iter: u64) -> () {
     }
 }
 
-#[cfg(RUSTC_IS_NIGHTLY)]
-#[feature(never_type)]
 /// Start engine execution on this thread
 /// 
-/// This enters an infinite loop that calls [`engine::update_engine`], 
-/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`engine::set_update_freq`]) seconds.
-/// The value of `cur_iter` passed to [`engine::update_engine`] is a variable incremented every time the loop is executed
+/// This enters an loop that calls [`update_engine`], 
+/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`set_update_freq`]) seconds.
+/// The value of `cur_iter` passed to [`update_engine`] is a variable incremented every time the loop is executed
 /// 
 /// This state of execution only takes control of one thread, and other threads can generally continue without issue,
 /// however new vulnerabilities cannot be added.
-pub fn enter_engine() -> ! {
+pub fn enter_engine() -> () {
     let mut iterations = 0;
+
+    (*ENGINE_IS_RUNNING).store(true, Ordering::SeqCst);
     // TODO: init
     
-    loop {
+    while (*ENGINE_IS_RUNNING).load(Ordering::SeqCst) {
         update_engine(iterations);
         iterations += 1;
 
@@ -199,23 +200,10 @@ pub fn enter_engine() -> ! {
     }
 }
 
-#[cfg(not(RUSTC_IS_NIGHTLY))]
-/// Start engine execution on this thread
+/// Tells the engine to exit.
 /// 
-/// This enters an infinite loop that calls [`engine::update_engine`], 
-/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`engine::set_update_freq`]) seconds.
-/// The value of `cur_iter` passed to [`engine::update_engine`] is a variable incremented every time the loop is executed
-/// 
-/// This state of execution only takes control of one thread, and other threads can generally continue without issue,
-/// however new vulnerabilities cannot be added.
-pub fn enter_engine() -> () {
-    let mut iterations = 0;
-    // TODO: init
-    
-    loop {
-        update_engine(iterations);
-        iterations += 1;
-
-        sleep(Duration::from_secs((*INCOMPLETE_FREQ).load(Ordering::SeqCst)));
-    }
+/// This stops engine execution if [`enter_engine()`] was called.
+/// Otherwise does nothing
+pub fn stop_engine() -> () {
+    (*ENGINE_IS_RUNNING).store(false, Ordering::SeqCst)
 }

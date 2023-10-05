@@ -3,7 +3,7 @@
 *   A cyberpatriots scoring engine library
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
-pub mod user;
-pub mod program;
+mod user;
+mod program;
 pub use user::*;
 pub use program::*;

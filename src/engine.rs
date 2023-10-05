@@ -10,6 +10,7 @@ pub use crate::state::{
     AppInstallMethod as InstallMethod,
     enter_engine,
     update_engine,
+    stop_engine,
 };
 use std::{fs::File, string::String, str::FromStr};
 

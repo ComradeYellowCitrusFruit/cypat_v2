@@ -14,7 +14,7 @@ use std::{
 	process::{Command, Stdio},
 };
 
-
+/// An entry to the /etc/group file.
 #[cfg(target_os = "linux")]
 #[derive(Clone)]
 pub struct GroupEntry {
@@ -23,6 +23,7 @@ pub struct GroupEntry {
 	pub list: Vec<String>,
 }
 
+/// An entry to the /etc/passwd file.
 #[cfg(target_os = "linux")]
 #[derive(Clone)]
 pub struct PasswdEntry {
@@ -37,6 +38,7 @@ pub struct PasswdEntry {
 
 #[cfg(target_os = "linux")]
 impl PasswdEntry {
+	/// Parse a passwd entry from a string
 	pub fn parse_entry(entry: &str) -> PasswdEntry {
 		let tokenized_entry: Vec<&str> = entry.split(':').collect();
 
@@ -51,6 +53,7 @@ impl PasswdEntry {
 		}
 	}
 
+	/// Try to find and parse an entry with username `name` in `reader`
 	pub fn find_and_parse_entry<T>(name: &str, reader: T) -> Option<PasswdEntry>
 	where
 		T: BufRead + Read
@@ -70,12 +73,13 @@ impl PasswdEntry {
 	}
 }
 
+/// Checks if a user with username `name` exists on the system
 pub fn user_exists(name: &str) -> bool {
 	#[cfg(target_os = "linux")]
 	{
 		// not quite what I'd like to do but that's fine
 		let reader = BufReader::new(File::open("/etc/passwd").expect("Geniunely what the fuck?"));
-		PasswdEntry::find_and_parse_entry(name, reader).is_none()
+		PasswdEntry::find_and_parse_entry(name, reader).is_some()
 	}
 	#[cfg(target_os = "windows")]
 	{
@@ -89,6 +93,7 @@ pub fn user_exists(name: &str) -> bool {
 	}
 }
 
+/// Checks if a group named `name` exists on the system
 pub fn group_exists(name: &str) -> bool {
 	#[cfg(target_os = "linux")]
 	{
@@ -121,6 +126,10 @@ pub fn group_exists(name: &str) -> bool {
 	}
 }
 
+/// Checks if a user named `uname` is in the group named `gname`.
+/// 
+/// If it returns an [`Ok`] value, the both the user and group exist, and the payload contains if the user is in the group.
+/// If it returns an [`Err`] value, either the user or group doesn't exist
 pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
 	#[cfg(target_os = "linux")]
 	{
@@ -161,6 +170,13 @@ pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, ()> {
 	}
 }
 
+/// Checks if the user has administrator privileges. 
+/// 
+/// On Linux, it checks if the user is either root, or if they have access to sudo.
+/// On Windows, it checks if the user is a member of the Administrators group.
+/// 
+/// If it returns an [`Ok`] value, the user exists and the payload contians if the user has admin privileges
+/// If it returns an [`Err`] value, the user does not exist
 pub fn user_is_admin(name: &str) -> Result<bool, ()> {
     #[cfg(target_os = "linux")]
     {
