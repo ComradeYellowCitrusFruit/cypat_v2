@@ -17,10 +17,10 @@ use std::{fs::File, string::String, str::FromStr};
 /// Register a file based vulnerability
 /// 
 /// Register a file based vulnerability.
-/// This takes the form of a function/closure that takes an `Option<&mut File>` as it's only parameter, and returns a bool.
+/// This takes the form of a function/closure that takes an [`Option<&mut File>`] as it's only parameter, and returns a [`bool`].
 /// 
 /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
+/// More on that in [`update_engine`] and [`enter_engine`]
 pub fn add_file_vuln<F>(name: &str, f: F)
 where 
     F: FnMut(Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -36,10 +36,10 @@ where
 /// Register a package/app based vulnerability
 /// 
 /// Register a package/app based vulnerability.
-/// This takes the form of a function/closure that takes an `AppData` as it's only parameter, and returns a bool.
+/// This takes the form of a function/closure that takes an [`AppData`] as it's only parameter, and returns a [`bool`].
 /// 
 /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
+/// More on that in [`update_engine`] and [`enter_engine`]
 pub fn add_appbased_vuln<F>(name: &str, install_method: InstallMethod, f: F)
 where 
     F: FnMut(AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -55,10 +55,10 @@ where
 /// Register a user based vulnerability
 /// 
 /// Register a user based vulnerability.
-/// This takes the form of a function/closure that takes an `&str` as it's only parameter, and returns a bool.
+/// This takes the form of a function/closure that takes an [`str`] as it's only parameter, and returns a [`bool`].
 /// 
 /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
+/// More on that in [`update_engine`] and [`enter_engine`]
 pub fn add_userbased_vuln<F>(name: &str, f: F)
 where 
     F: FnMut(&str) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -73,10 +73,10 @@ where
 /// Register a miscellaneous vulnerability
 /// 
 /// Register a miscellaneous vulnerability.
-/// This takes the form of a function/closure that takes no parameters, and returns a bool.
+/// This takes the form of a function/closure that takes no parameters, and returns a [`bool`].
 /// 
 /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-/// More on that in [`engine::update_engine`] and [`engine::enter_engine`]
+/// More on that in [`update_engine`] and [`enter_engine`]
 pub fn add_misc_vuln<F>(f: F)
 where
     F: FnMut(()) -> bool + Send + Sync + 'static,
