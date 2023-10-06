@@ -6,6 +6,7 @@
 
 use std::{result::Result, process::{Command, Stdio, ExitStatus}};
 
+/// Check if the file named `name` is owned by the user with UID `uid`
 #[cfg(target_os = "linux")]
 pub fn file_owned_by_uid(uid: u64, name: &str) -> Result<bool, ()> {
     let cmd = Command::new("stat").args(&["-c", "%u", name])
@@ -17,6 +18,7 @@ pub fn file_owned_by_uid(uid: u64, name: &str) -> Result<bool, ()> {
     }
 }
 
+/// Check if the file named `name` is owned by the group with GID `gid`
 #[cfg(target_os = "linux")]
 pub fn file_owned_by_gid(gid: u64, name: &str) -> Result<bool, ()> {
     let cmd = Command::new("stat").args(&["-c", "%g", name])
@@ -28,6 +30,7 @@ pub fn file_owned_by_gid(gid: u64, name: &str) -> Result<bool, ()> {
     }
 }
 
+/// Check if the file named `fname` is owned by the user named `uname`
 pub fn filed_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
     #[cfg(target_os = "linux")]
     {
@@ -45,6 +48,7 @@ pub fn filed_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
     }
 }
 
+/// Check if the file named `fname` is owned by the group named `gname`
 pub fn filed_owned_by_group(gname: &str, fname: &str) -> Result<bool, ()> {
     #[cfg(target_os = "linux")]
     {
