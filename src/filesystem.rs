@@ -166,7 +166,7 @@ fn get_named_data_toml(name: &str) -> Value {
 /// Looks up something in the database
 /// 
 /// Fetches the value of `name` from the database.
-/// Note that if the value isn't found or is null, [`filesystem::Value::Null`] will be returned either way.
+/// Note that if the value isn't found or is null, [`Value::Null`] will be returned either way.
 pub fn get_database_entry(name: &str) -> Value {
     let mut r = get_named_data_json(name);
 

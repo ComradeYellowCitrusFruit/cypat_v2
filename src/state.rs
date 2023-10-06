@@ -13,7 +13,7 @@ use std::{
     thread::sleep,
 };
 
-/// Contains package install information.
+/// Contains package install method.
 #[derive(Clone, Copy)]
 pub enum AppInstallMethod {
     Default,
@@ -109,7 +109,7 @@ pub fn generate_score_report() -> Vec<(String, i32)> {
 /// 
 /// Sets the frequency in seconds at which [`update_engine`] is called, if using [`enter_engine`].
 /// 
-/// Internally this is handled as a variable called `INCOMPLETE_UPDATE_FREQ`
+/// Internally this is handled as a variable called [`INCOMPLETE_UPDATE_FREQ`][`set_update_freq`]
 pub fn set_update_freq(frequency: u64) {
     (*INCOMPLETE_FREQ).store(frequency, Ordering::SeqCst);
 }
@@ -119,7 +119,7 @@ pub fn set_update_freq(frequency: u64) {
 /// Sets the frequency in iterations of engine updates that completed vulnerabilities are re-executed.
 /// This value is important even if you don't use [`enter_engine`] because of the way it is interpreted by [`update_engine`]
 /// 
-/// Internally this is handled as a variable called `COMPLETE_UPDATE_FREQ`
+/// Internally this is handled as a variable called [`COMPLETE_UPDATE_FREQ`][`set_completed_update_freq`]
 pub fn set_completed_update_freq(frequency: u64) {
     (*COMPLETE_FREQ).store(frequency, Ordering::SeqCst);
 }
@@ -162,7 +162,7 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
 /// Executes vulnerabilites
 /// 
 /// Incomplete vulnerabilites are excuted each time the function is executed.
-/// Complete vulnerabilites are excuted only if `cur_iter` mod `COMPLETE_UPDATE_FREQ` is 0
+/// Complete vulnerabilites are excuted only if `cur_iter` mod [`COMPLETE_UPDATE_FREQ`][`set_completed_update_freq`] is 0
 pub fn update_engine(cur_iter: u64) -> () {
     match (*VULNS).lock() {
         Ok(mut g) => {
@@ -181,7 +181,7 @@ pub fn update_engine(cur_iter: u64) -> () {
 /// Start engine execution on this thread
 /// 
 /// This enters an loop that calls [`update_engine`], 
-/// and then sleeps for `INCOMPLETE_UPDATE_FREQ` (see [`set_update_freq`]) seconds.
+/// and then sleeps for [`INCOMPLETE_UPDATE_FREQ`][`set_update_freq`] seconds.
 /// The value of `cur_iter` passed to [`update_engine`] is a variable incremented every time the loop is executed
 /// 
 /// This state of execution only takes control of one thread, and other threads can generally continue without issue,

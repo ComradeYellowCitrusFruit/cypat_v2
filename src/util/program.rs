@@ -11,7 +11,7 @@ use std::{
 };
 use crate::state::{AppData, AppInstallMethod};
 
-/// A bool but with three options, [`TripleBool::Known(true)`], [`TripleBool::Known(false)`], [`TripleBool::Unknown`]
+/// A bool but with three options, [`TripleBool::Known`], [`TripleBool::Unknown`]
 #[derive(Copy, Clone)]
 pub enum TripleBool {
 	Known(bool),
@@ -78,8 +78,8 @@ impl AppData {
 
 	/// Checks if a package is installed
 	/// 
-	/// For WinGet, APT ([`InstallMethod::Default`] on Linux, aka [`InstallMethod::SystemPackageManager`]), [`InstallMethod::Flatpak`], and [`InstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
-	/// For [`InstallMethod::SystemPackageManager`]/[`InstallMethod::Default`] on Windows, this just calls [`util::is_package_installed`]. \
+	/// For WinGet, APT ([`AppInstallMethod::Default`] on Linux, aka [`AppInstallMethod::SystemPackageManager`]), [`AppInstallMethod::Flatpak`], and [`AppInstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
+	/// For [`AppInstallMethod::SystemPackageManager`]/[`AppInstallMethod::Default`] on Windows, this just calls [`is_package_installed`]. \
 	/// For anything else, it default returns [`TripleBool::Unknown`]
 	pub fn is_installed(&self) -> TripleBool {
 

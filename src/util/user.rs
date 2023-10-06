@@ -71,6 +71,22 @@ impl PasswdEntry {
 
 		None
 	}
+
+	/// Parses all entries in `reader`, and collects them into a single [`Vec`]
+	pub fn find_and_parse_all<T>(reader: T) -> Vec<PasswdEntry>
+	where
+		T: BufRead + Read
+	{
+		let mut vec = Vec::new();
+		for i in reader.lines().map(|l| l.ok()) {
+			match i {
+				Some(s) => vec.push(Self::parse_entry(&s)),
+				None => break,
+			}
+		}
+
+		vec
+	}
 }
 
 /// Checks if a user with username `name` exists on the system
