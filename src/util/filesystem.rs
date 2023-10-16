@@ -31,7 +31,7 @@ pub fn file_owned_by_gid(gid: u64, name: &str) -> Result<bool, ()> {
 }
 
 /// Check if the file named `fname` is owned by the user named `uname`
-pub fn filed_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
+pub fn file_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
     #[cfg(target_os = "linux")]
     {
         let cmd = Command::new("stat").args(&["-c", "%U", fname])
@@ -56,7 +56,7 @@ pub fn filed_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
 
 /// Check if the file named `fname` is owned by the group named `gname`
 #[cfg(target_os = "linux")]
-pub fn filed_owned_by_group(gname: &str, fname: &str) -> Result<bool, ()> {
+pub fn file_owned_by_group(gname: &str, fname: &str) -> Result<bool, ()> {
     let cmd = Command::new("stat").args(&["-c", "%G", fname])
         .stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("Either something broke or we aren't on GNU/Linux");
     if cmd.status.success() {

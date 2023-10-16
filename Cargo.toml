@@ -1,6 +1,6 @@
 [package]
 name = "cypat_scoring_engine"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Teresa Maria Rivera"]
 description = "A CyberPatriots scoring engine library"
 repository = "https://github.com/ComradeYellowCitrusFruit/cypat_v2"
