@@ -44,24 +44,24 @@ pub fn filed_owned_by_user(uname: &str, fname: &str) -> Result<bool, ()> {
     }
     #[cfg(target_os = "windows")]
     {
-        todo!()
-    }
-}
-
-/// Check if the file named `fname` is owned by the group named `gname`
-pub fn filed_owned_by_group(gname: &str, fname: &str) -> Result<bool, ()> {
-    #[cfg(target_os = "linux")]
-    {
-        let cmd = Command::new("stat").args(&["-c", "%G", fname])
-            .stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("Either something broke or we aren't on GNU/Linux");
+        let cmd = Command::new("dir").args(&["/q", fname])
+            .stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("What kind of Windows is this?");
         if cmd.status.success() {
-            Ok(String::from_utf8_lossy(&cmd.stdout) == gname)
+            Ok(String::from_utf8_lossy(&cmd.stdout).contains(uname))
         } else {
             Err(())
         }
     }
-    #[cfg(target_os = "windows")]
-    {
-        todo!()
+}
+
+/// Check if the file named `fname` is owned by the group named `gname`
+#[cfg(target_os = "linux")]
+pub fn filed_owned_by_group(gname: &str, fname: &str) -> Result<bool, ()> {
+    let cmd = Command::new("stat").args(&["-c", "%G", fname])
+        .stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("Either something broke or we aren't on GNU/Linux");
+    if cmd.status.success() {
+        Ok(String::from_utf8_lossy(&cmd.stdout) == gname)
+    } else {
+       Err(())
     }
 }
