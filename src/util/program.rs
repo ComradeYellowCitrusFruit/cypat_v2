@@ -95,7 +95,7 @@ impl AppData {
 				}
 				#[cfg(target_os = "windows")]
 				{
-					TripleBool::Known(is_package_installed(self.name))
+					TripleBool::Known(is_package_installed(&self.name))
 				}
 			},
 			#[cfg(target_os = "linux")]
