@@ -4,7 +4,7 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-use std::{result::Result, process::{Command, Stdio, ExitStatus}};
+use std::{result::Result, process::{Command, Stdio}};
 
 /// Check if the file named `name` is owned by the user with UID `uid`
 #[cfg(target_os = "linux")]

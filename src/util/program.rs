@@ -9,7 +9,7 @@ use std::{
 	fs::File,
 	process::{Command, Stdio},
 };
-use crate::state::{AppData, AppInstallMethod};
+use crate::engine::{AppData, InstallMethod};
 
 /// A bool but with three options, [`TripleBool::Known`], [`TripleBool::Unknown`]
 #[derive(Copy, Clone)]
@@ -72,19 +72,19 @@ pub fn is_package_installed(name: &str) -> bool {
 }
 
 impl AppData {
-	pub fn new(name: &str, install_method: AppInstallMethod) -> Self {
+	pub fn new(name: &str, install_method: InstallMethod) -> Self {
 		Self { name: name.to_string(), install_method: install_method }
 	}
 
 	/// Checks if a package is installed
 	/// 
-	/// For WinGet, APT ([`AppInstallMethod::Default`] on Linux, aka [`AppInstallMethod::SystemPackageManager`]), [`AppInstallMethod::Flatpak`], and [`AppInstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
-	/// For [`AppInstallMethod::SystemPackageManager`]/[`AppInstallMethod::Default`] on Windows, this just calls [`is_package_installed`]. \
+	/// For WinGet, APT ([`InstallMethod::Default`] on Linux, aka [`InstallMethod::SystemPackageManager`]), [`InstallMethod::Flatpak`], and [`InstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
+	/// For [`InstallMethod::SystemPackageManager`]/[`InstallMethod::Default`] on Windows, this just calls [`is_package_installed`]. \
 	/// For anything else, it default returns [`TripleBool::Unknown`]
 	pub fn is_installed(&self) -> TripleBool {
 
 		match self.install_method {
-			AppInstallMethod::Default | AppInstallMethod::SystemPackageManager => {
+			InstallMethod::Default | InstallMethod::SystemPackageManager => {
 				#[cfg(target_os = "linux")]
 				{
 					let dpkg_cmd = Command::new("dpkg").args(&["-l"])
@@ -99,7 +99,7 @@ impl AppData {
 				}
 			},
 			#[cfg(target_os = "linux")]
-			AppInstallMethod::Flatpak => {
+			InstallMethod::Flatpak => {
 				#[cfg(target_os = "linux")]
 				{
 					match Command::new("flatpak").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
@@ -111,7 +111,7 @@ impl AppData {
 				}
 			},
 			#[cfg(target_os = "linux")]
-			AppInstallMethod::Snap => {
+			InstallMethod::Snap => {
 				#[cfg(target_os = "linux")]
 				{
 					match Command::new("snap").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
@@ -123,7 +123,7 @@ impl AppData {
 				}
 			},
 			#[cfg(target_os = "windows")]
-			AppInstallMethod::WinGet => {
+			InstallMethod::WinGet => {
 				match Command::new("winget").args(&["list", "--name"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
 					Some(output) => {
 						TripleBool::Known(String::from_utf8_lossy(&output.stdout).contains(&self.name))

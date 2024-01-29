@@ -1,6 +1,6 @@
 [package]
 name = "cypat_scoring_engine"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Teresa Maria Rivera"]
 description = "A CyberPatriots scoring engine library"
 repository = "https://github.com/ComradeYellowCitrusFruit/cypat_v2"
@@ -18,17 +18,9 @@ crate-type = ["lib"]
 [build-dependencies]
 rustc_version = "0.4"
 
-[dependencies]
-lazy_static = "1.4"
-serde = { version = "1.0", optional = true }
-serde_json = { version = "1.0", optional = true }
-serde_yaml = { version = "0.9", optional = true }
-toml = { version = "0.8", optional = true }
-
 [features]
 default = ["utility"]
 utility = []
-database = ["dep:serde", "dep:serde_json", "dep:serde_yaml", "dep:toml"]
 # sql_data = []
 
 [profile.dev]
