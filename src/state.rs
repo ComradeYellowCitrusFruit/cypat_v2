@@ -48,7 +48,7 @@ pub(crate) struct UserData {
     pub(crate) name: String,
 }
 
-pub(crate) enum ConditionData {
+pub(crate) enum Condition {
     FileVuln(FileData, Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>),
     AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
     UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
@@ -57,7 +57,7 @@ pub(crate) enum ConditionData {
 
 lazy_static! {
     static ref SCORE: Mutex<Vec<(u64, i32, String)>> = Mutex::new(Vec::with_capacity(32));
-    static ref VULNS: Mutex<Vec<(ConditionData, bool)>> = Mutex::new(Vec::with_capacity(32));
+    static ref VULNS: Mutex<Vec<(Condition, bool)>> = Mutex::new(Vec::with_capacity(32));
     static ref START_TIME: Instant = Instant::now();
     static ref INCOMPLETE_FREQ: AtomicU64 = AtomicU64::new(1);
     static ref COMPLETE_FREQ: AtomicU64 = AtomicU64::new(5);
@@ -124,16 +124,16 @@ pub fn set_completed_update_freq(frequency: u64) {
     (*COMPLETE_FREQ).store(frequency, Ordering::SeqCst);
 }
 
-pub(crate) fn add_vuln(vuln: ConditionData) {
+pub(crate) fn add_vuln(vuln: Condition) {
     match (*VULNS).lock() {
         Ok(mut g) => g.push((vuln, false)),
         Err(g) => panic!("{}", g),
     }
 }
 
-fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
+fn handle_vulnerability(vuln: &mut (Condition, bool)) {
     match &mut vuln.0 {
-        ConditionData::FileVuln(d, f) => {
+        Condition::FileVuln(d, f) => {
             let pf = File::open(d.name.clone()).ok();
 
             match pf {
@@ -147,13 +147,13 @@ fn handle_vulnerability(vuln: &mut (ConditionData, bool)) {
                 },
             }
         },
-        ConditionData::AppVuln(a, f) => {
+        Condition::AppVuln(a, f) => {
             vuln.1 = f(a.clone());
         },
-        ConditionData::UserVuln(u, f) => {
+        Condition::UserVuln(u, f) => {
             vuln.1 = f(u.name.as_str());
         },
-        ConditionData::CustomVuln(f) => {
+        Condition::CustomVuln(f) => {
             vuln.1 = f(());
         },
     }
