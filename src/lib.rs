@@ -41,10 +41,12 @@
 //!     set_completed_update_freq(1);
 //!     add_file_vuln("example.txt", func);
 //! 
-//!     enter_engine();
+//!     enter();
 //! }
 //! ```
-pub mod engine;
+
+mod engine;
+pub use engine::*;
 
 #[cfg(feature = "utility")]
 pub mod util;

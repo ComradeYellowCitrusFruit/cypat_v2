@@ -18,6 +18,9 @@ crate-type = ["lib"]
 [build-dependencies]
 rustc_version = "0.4"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2.152"
+
 [features]
 default = ["utility"]
 utility = []

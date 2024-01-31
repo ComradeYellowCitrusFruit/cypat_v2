@@ -66,6 +66,17 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn new() -> Engine {
+        Engine {
+            is_running: AtomicBool::new(false),
+            score: Arc::new(Mutex::new(Vec::new())),
+            vulns: Arc::new(Mutex::new(Vec::new())),
+            incomplete_freq: AtomicU64::new(5),
+            complete_freq: AtomicU64::new(10),
+            in_execution: AtomicBool::new(false),
+        }
+    }
+
     pub(crate) fn add_vuln(&mut self, vuln: Condition) {
         match (*self.vulns).lock() {
             Ok(mut g) => g.push((vuln, false)),
@@ -79,7 +90,7 @@ impl Engine {
     /// This takes the form of a function/closure that takes an [`Option<&mut File>`] as it's only parameter, and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-    /// More on that in [`update_engine`] and [`enter_engine`]
+    /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_file_vuln<F>(&mut self, name: &str, f: F)
     where 
         F: FnMut(Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -98,7 +109,7 @@ impl Engine {
     /// This takes the form of a function/closure that takes an [`AppData`] as it's only parameter, and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-    /// More on that in [`update_engine`] and [`enter_engine`]    
+    /// More on that in [`Engine::update`] and [`Engine::enter`]    
     pub fn add_app_vuln<F>(&mut self, name: &str, install_method: InstallMethod, f: F)
     where 
         F: FnMut(AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -117,7 +128,7 @@ impl Engine {
     /// This takes the form of a function/closure that takes an [`str`] as it's only parameter, and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-    /// More on that in [`update_engine`] and [`enter_engine`]
+    /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_user_vuln<F>(&mut self, name: &str, f: F)
     where 
         F: FnMut(&str) -> bool + Send + Sync + 'static, // Whiny ass compiler
@@ -135,7 +146,7 @@ impl Engine {
     /// This takes the form of a function/closure that takes no parameters, and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
-    /// More on that in [`update_engine`] and [`enter_engine`]
+    /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_misc_vuln<F>(&mut self, f: F)
     where
         F: FnMut(()) -> bool + Send + Sync + 'static,
@@ -145,7 +156,7 @@ impl Engine {
 
     /// Sets the frequency in seconds at which the engine is updated.
     /// 
-    /// Sets the frequency in seconds at which [`Engine::update`] is called, if using [`Engine::enter_engine`].
+    /// Sets the frequency in seconds at which [`Engine::update`] is called, if using [`Engine::enter`].
     /// 
     /// This is handled as a private variable called [`incomplete_freq`][`Engine::set_freq`]
     pub fn set_freq(&mut self, frequency: u64) {
@@ -155,7 +166,7 @@ impl Engine {
     /// Sets the frequency in iterations of engine updates that completed vulnerabilities are reviewed.
     /// 
     /// Sets the frequency in iterations of engine updates that completed vulnerabilities are re-executed.
-    /// This value is important even if you don't use [`Engine::enter_engine`] because of the way it is interpreted by [`update_engine`]
+    /// This value is important even if you don't use [`Engine::enter`] because of the way it is interpreted by [`Engine::update`]
     /// 
     /// Internally this is handled as a variable called [`complete_freq`][`Engine::set_completed_freq`]
     pub fn set_completed_freq(&mut self, frequency: u64) {
@@ -254,13 +265,12 @@ impl Engine {
 
     /// Start engine execution on this thread
     /// 
-    /// This enters an loop that calls [`Engine::update`], 
-    /// and then sleeps for [`incomplete_freq`][`Engine::set_freq`] seconds.
+    /// This enters an loop that calls [`Engine::update`] [`incomplete_freq`][`Engine::set_freq`] times per second.
     /// The value of `cur_iter` passed to [`Engine::update`] is a variable incremented every time the loop is executed
     /// 
     /// This state of execution only takes control of one thread, and other threads can generally continue without issue,
     /// however new vulnerabilities cannot be added.
-    pub fn enter_engine(&mut self) -> () {
+    pub fn enter(&mut self) -> () {
         let mut iterations = 0;
 
         self.is_running.store(true, Ordering::SeqCst);
@@ -270,13 +280,13 @@ impl Engine {
             self.update(iterations);
             iterations += 1;
 
-            sleep(Duration::from_secs(self.incomplete_freq.load(Ordering::SeqCst)));
+            sleep(Duration::from_secs_f32(1.0/(self.incomplete_freq.load(Ordering::SeqCst) as f32)));
         }
     }
 
     /// Tells the engine to exit.
     /// 
-    /// This stops engine execution if [`Engine::enter_engine`] was called.
+    /// This stops engine execution if [`Engine::enter`] was called.
     /// Otherwise does nothing.
     /// If `blocking` is set, it will wait until the current running update stops to return.
     pub fn stop_engine(&mut self, blocking: bool) -> () {
