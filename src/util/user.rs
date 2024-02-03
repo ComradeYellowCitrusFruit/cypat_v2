@@ -13,7 +13,8 @@ use std::{
 	ptr::{null, null_mut}, 
 	str::FromStr, 
 	string::String, 
-	vec::Vec
+	vec::Vec,
+	ffi::CString,
 };
 
 use super::errno;
@@ -56,8 +57,8 @@ pub struct PasswdEntry {
 #[cfg(target_os = "linux")]
 impl PasswdEntry {
 	/// Parse a passwd entry from a string
-	pub fn parse_entry(entry: &str) -> PasswdEntry {
-		let tokenized_entry: Vec<&str> = entry.split(':').collect();
+	pub fn parse_entry<T: ToString>(entry: &T) -> PasswdEntry {
+		let tokenized_entry: Vec<_> = entry.to_string().split(':').collect();
 
 		PasswdEntry {
 			username: tokenized_entry[0].to_string(),
@@ -69,55 +70,25 @@ impl PasswdEntry {
 			shell: tokenized_entry[6].to_string(),
 		}
 	}
+	
+	pub fn get_entry_from_passwd<T: ToString>(name: &T) -> Result<PasswdEntry, i32> {
+		let mut username = match CString::new(name.to_string()) {
+			Ok(s) => s,
+			_ => return Err(-1),
+		};
 
-	/// Try to find and parse an entry with username `name` in `reader`
-	pub fn find_and_parse_entry<T>(name: &str, reader: T) -> Option<PasswdEntry>
-	where
-		T: BufRead + Read
-	{
-		for i in reader.lines().map(|l| l.ok()) {
-			match i {
-				Some(s) => {
-					if s.split(':').collect::<Vec<_>>()[0] == String::from_str(name).unwrap() {
-						return Some(Self::parse_entry(&s));
-					}
-				},
-				None => break,
-			}
-		}
-
-		None
-	}
-
-	/// Parses all entries in `reader`, and collects them into a single [`Vec`]
-	pub fn find_and_parse_all<T>(reader: T) -> Vec<PasswdEntry>
-	where
-		T: BufRead + Read
-	{
-		let mut vec = Vec::new();
-		for i in reader.lines().map(|l| l.ok()) {
-			match i {
-				Some(s) => vec.push(Self::parse_entry(&s)),
-				None => break,
-			}
-		}
-
-		vec
-	}
-
-	pub fn get_entry_from_passwd(name: &str) -> Result<PasswdEntry, i32> {
 		unsafe {
 			let mut pass = MaybeUninit::zeroed().assume_init();
         	let mut pass_ptr = MaybeUninit::zeroed().assume_init();
         	let mut buf = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
         	let mut res ;
 			let tmp;
-        	res = getpwnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	res = getpwnam_r(username.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
 
         	while res != 0 && errno() == libc::ERANGE {
             	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
             	buf.append(&mut nb);
-            	res = getpwnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+            	res = getpwnam_r(username.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
         	}
 
 			if res != 0 {
@@ -141,7 +112,12 @@ impl PasswdEntry {
 
 #[cfg(target_os = "linux")]
 impl GroupEntry {
-	pub fn get_entry_from_group(name: &str) -> Result<GroupEntry, i32> {
+	pub fn get_entry_from_group<T: ToString>(name: &T) -> Result<GroupEntry, i32> {
+		let mut username = match CString::new(name.to_string()) {
+			Ok(s) => s,
+			_ => return Err(-1),
+		};
+
 		unsafe {
 			let mut pass = MaybeUninit::zeroed().assume_init();
         	let mut pass_ptr = MaybeUninit::zeroed().assume_init();
@@ -149,12 +125,12 @@ impl GroupEntry {
         	let mut res ;
 			let mut ret;
 			let tmp;
-        	res = getgrnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	res = getgrnam_r(groupname.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
 
         	while res != 0 && errno() == libc::ERANGE {
             	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
             	buf.append(&mut nb);
-            	res = getgrnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+            	res = getgrnam_r(groupname.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
         	}
 
 			if res != 0 {
@@ -183,19 +159,25 @@ impl GroupEntry {
 
 /// Checks if a user with username `name` exists on the system
 
-pub fn user_exists(name: &str) -> Result<bool, i32> {
+pub fn user_exists<T: ToString>(n: &T) -> Result<bool, i32> {
+	let name = n.to_string();
 	#[cfg(target_os = "linux")]
 	unsafe {
+		let username = match CString::new(name) {
+			Ok(s) => s,
+			_ => return Err(-1),
+		};
+
 		let mut pass = MaybeUninit::zeroed().assume_init();
         let mut pass_ptr = MaybeUninit::zeroed().assume_init();
     	let mut buf = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
     	let mut res ;
-    	res = getpwnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+    	res = getpwnam_r(username.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
 
         while res != 0 && errno() == libc::ERANGE {
         	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
             buf.append(&mut nb);
-        	res = getpwnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	res = getpwnam_r(username.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
     	}
 
 		if res == 0 {
@@ -210,7 +192,7 @@ pub fn user_exists(name: &str) -> Result<bool, i32> {
 	#[cfg(target_os = "windows")]
 	unsafe {
 		let mut user: USER_INFO_0 = null_mut();
-		let mut uname_utf16 = uname.encode_utf16().collect::<Vec<u16>>();
+		let mut uname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
 
 		match NetGroupGetInfo(null, uname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
 			0 => { NetApiBufferFree(user as *mut c_void); Ok(true) },
@@ -221,19 +203,25 @@ pub fn user_exists(name: &str) -> Result<bool, i32> {
 }
 
 /// Checks if a group named `name` exists on the system
-pub fn group_exists(name: &str) -> Result<bool, i32> {
+pub fn group_exists<T: ToString>(n: &T) -> Result<bool, i32> {
+	let name = n.to_string();
 	#[cfg(target_os = "linux")]
 	unsafe {
+		let groupname = match CString::new(name) {
+			Ok(s) => s,
+			_ => return Err(-1),
+		};
+
 		let mut pass = MaybeUninit::zeroed().assume_init();
         let mut pass_ptr = MaybeUninit::zeroed().assume_init();
     	let mut buf = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
     	let mut res ;
-    	res = getgrnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+    	res = getgrnam_r(groupname.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
 
         while res != 0 && errno() == libc::ERANGE {
         	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
             buf.append(&mut nb);
-        	res = getgrnam_r(name.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	res = getgrnam_r(groupname.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
     	}
 
 		if res == 0 {
@@ -248,7 +236,7 @@ pub fn group_exists(name: &str) -> Result<bool, i32> {
 	#[cfg(target_os = "windows")]
 	unsafe {
 		let mut group: GROUP_INFO_0 = null_mut();
-		let mut gname_utf16 = gname.encode_utf16().collect::<Vec<u16>>();
+		let mut gname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
 
 		match NetGroupGetInfo(null, gname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
 			0 => { NetApiBufferFree(group as *mut c_void); Ok(true) },
@@ -262,16 +250,18 @@ pub fn group_exists(name: &str) -> Result<bool, i32> {
 /// 
 /// If it returns an [`Ok`] value, the both the user and group exist, and the payload contains if the user is in the group.
 /// If it returns an [`Err`] value, either the user or group doesn't exist
-pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, i32> {
-	user_exists(uname)?;
-	group_exists(gname)?;
+pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, i32> {
+	user_exists(u)?;
+	group_exists(g)?;
 	#[cfg(target_os = "linux")]
 	{
-		let group = GroupEntry::get_entry_from_group(gname)?;
-		Ok(group.list.contains(&gname.to_string()))
+		let group = GroupEntry::get_entry_from_group(g)?;
+		Ok(group.list.contains(&g.to_string()))
 	}
 	#[cfg(target_os = "windows")]
 	{
+		let uname = u.to_string();
+		let gname = g.to_string();
 		let mut groups: LPLOCALGROUP_USERS_INFO_0 = null_mut();
 		let mut uname_utf16 = uname.encode_utf16().collect::<Vec<u16>>();
 		let mut gname_utf16 = gname.encode_utf16().collect::<Vec<u16>>();
@@ -330,16 +320,17 @@ pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, i32> {
 /// 
 /// If it returns an [`Ok`] value, the user exists and the payload contians if the user has admin privileges
 /// If it returns an [`Err`] value, the user does not exist
-pub fn user_is_admin(name: &str) -> Result<bool, ()> {
+pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, ()> {
+
     #[cfg(target_os = "linux")]
     {
-        if name == "root" {
+        if name.to_string() == "root" {
             Ok(true)
         } else {
             if user_exists(name).unwrap_or(false) {
                 let cmd = Command::new("sudo")
-                    .args(&["-l", "-U", &format!("{}", name)]).stderr(Stdio::null()).stdout(Stdio::piped())
-		            .output().expect("¿Por qué sudo no esta trabajando?");
+                    .args(&["-l", "-U", &format!("{}", name.to_string())]).stderr(Stdio::null()).stdout(Stdio::piped())
+		            .output().expect("¿Por qué sudo no está trabajando?");
                 let mensaje = format!("User {} is not allowed to run sudo", name);
 
                 Ok(!String::from_utf8_lossy(&cmd.stdout).contains(&mensaje))

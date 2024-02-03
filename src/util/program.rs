@@ -22,19 +22,20 @@ pub enum TripleBool {
 /// 
 /// On Linux, `name` should be the package name, to query package managers for.
 /// On Windows, `name` should be the name of the exe file, to query the registry for.
-pub fn is_package_installed(name: &str) -> bool {
+pub fn is_package_installed<T: ToString>(name: &T) -> bool {
 	#[cfg(target_os = "linux")]
  	{
+		let pkg_name = name.to_string();
 		let dpkg_cmd = Command::new("dpkg").args(&["-l"]).stderr(Stdio::null()).stdout(Stdio::piped())
 			.output().expect("O no estamos en una distribución basada en Debian o algo está realmente mal.");
 
-		if String::from_utf8_lossy(&dpkg_cmd.stdout).contains(name) {
+		if String::from_utf8_lossy(&dpkg_cmd.stdout).contains(pkg_name) {
 			return true;
 		}
 
 		match Command::new("flatpak").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
 			Some(output) => {
-				if String::from_utf8_lossy(&output.stdout).contains(name) {
+				if String::from_utf8_lossy(&output.stdout).contains(pkg_name) {
 					return true;
 				}
 			},
@@ -43,7 +44,7 @@ pub fn is_package_installed(name: &str) -> bool {
 
 		match Command::new("snap").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
 			Some(output) => {
-				if String::from_utf8_lossy(&output.stdout).contains(name) {
+				if String::from_utf8_lossy(&output.stdout).contains(pkg_name) {
 					return true;
 				}
 			},
@@ -60,7 +61,7 @@ pub fn is_package_installed(name: &str) -> bool {
 		match cmd.ok() {
 			Some(o) => {
 				let tmp = String::from_utf8_lossy(&o.stdout);
-	    		if tmp.contains(name) {
+	    		if tmp.contains(name.to_string()) {
 					true
 				} else {
 					false
@@ -72,7 +73,7 @@ pub fn is_package_installed(name: &str) -> bool {
 }
 
 impl AppData {
-	pub fn new(name: &str, install_method: InstallMethod) -> Self {
+	pub fn new<T: ToString>(name: &T, install_method: InstallMethod) -> Self {
 		Self { name: name.to_string(), install_method: install_method }
 	}
 
