@@ -1,13 +1,22 @@
-/*  
+/*
 *   SPDX-License-Identifier: GPL-3.0-only
 *   A cyberpatriots scoring engine library
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-use std::{result::Result, process::{Command, Stdio}, mem::MaybeUninit};
+use std::{mem::MaybeUninit, process::{Command, Stdio}, ptr::null_mut, result::Result};
 
 #[cfg(target_os = "linux")]
 use libc::{uid_t, gid_t, stat, getpwnam_r, sysconf, getgrnam_r};
+
+#[cfg(target_os = "windows")]
+use winapi::um::{
+    fileapi::CreateFileW, 
+    winnt::{GENERIC_READ, FILE_ATTRIBUTE_NORMAL, READ_CONTROL}, 
+    handleapi::INVALID_HANDLE_VALUE,
+    accctrl::SE_OBJECT_TYPE,
+    aclapi::GetSecurityInfo
+};
 
 use super::errno;
 
@@ -62,12 +71,24 @@ pub fn file_owned_by_user(uname: &str, fname: &str) -> Result<bool, i32> {
     }
     #[cfg(target_os = "windows")]
     {
-        let cmd = Command::new("dir").args(&["/q", fname])
-            .stdout(Stdio::piped()).stderr(Stdio::piped()).output().expect("What kind of Windows is this?");
-        if cmd.status.success() {
-            Ok(String::from_utf8_lossy(&cmd.stdout).contains(uname))
+        let mut h = CreateFileW(fname.encode_utf16().collect::<Vec<_>>().as_ptr(), GENERIC_READ, 1, null_mut(), 3, FILE_ATTRIBUTE_NORMAL, null_mut());
+        let mut psid = null_mut();
+        let mut nombre = [0u16; 1024];
+        let mut tmp = 1024;
+        let mut garbage;
+        let mut name_use;
+        if h == INVALID_HANDLE_VALUE {
+            return Err(errno());
+        }
+
+        if GetSecurityInfo(h, SE_OBJECT_TYPE::SE_FILE_OBJECT, READ_CONTROL, &mut psid, null_mut(), null_mut(), null_mut()) != 0{
+            return Err(errno());
+        }
+
+        if LookupAccountSidW(null(), psid, &nombre.as_ptr(), &mut tmp, null_mut(), &mut garbage, &mut name_use) != 0 {
+            Ok(String::from_utf16(&nombre) == uname)
         } else {
-            Err(())
+            Err(errno())
         }
     }
 }

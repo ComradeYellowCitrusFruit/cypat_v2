@@ -6,13 +6,30 @@
 #![allow(unused_imports)]
 
 use std::{
-	fs::File, io::{BufRead, BufReader, Read}, mem::MaybeUninit, process::{Command, Stdio}, ptr::{null, null_mut}, str::FromStr, string::String, vec::Vec
+	fs::File, 
+	io::{BufRead, BufReader, Read}, 
+	mem::{ManuallyDrop, MaybeUninit}, 
+	process::{Command, Stdio}, 
+	ptr::{null, null_mut}, 
+	str::FromStr, 
+	string::String, 
+	vec::Vec
 };
 
 use super::errno;
 
 #[cfg(target_os = "linux")]
 use libc::{gid_t, uid_t, sysconf, getpwnam_r, getgrnam_r, getgrouplist, strlen};
+
+#[cfg(target_os = "windows")]
+use winapi::{
+	um::{
+		wincred::NERR_BASE,
+		lmaccess::{NetUserGetLocalGroups, NetGroupGetInfo, LPLOCALGROUP_USERS_INFO_0}, 
+		lmapibuf::NetApiBufferFree
+	}, 
+	ctypes::c_void
+};
 
 /// An entry to the /etc/group file.
 #[cfg(target_os = "linux")]
@@ -191,13 +208,14 @@ pub fn user_exists(name: &str) -> Result<bool, i32> {
 		}
 	}
 	#[cfg(target_os = "windows")]
-	{
-		let cmd = Command::new("net")
-        .args(&["user", &format!("{}", name)])
-		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
-		match cmd.ok() {
-			Some(o) => String::from_utf8_lossy(&o.stdout).contains(name),
-			None => false,
+	unsafe {
+		let mut user: USER_INFO_0 = null_mut();
+		let mut uname_utf16 = uname.encode_utf16().collect::<Vec<u16>>();
+
+		match NetGroupGetInfo(null, uname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
+			0 => { NetApiBufferFree(user as *mut c_void); Ok(true) },
+			(NERR_BASE+121) => Ok(false),
+			_ => Err(errno()),
 		}
 	}
 }
@@ -228,13 +246,14 @@ pub fn group_exists(name: &str) -> Result<bool, i32> {
 		}
 	}
 	#[cfg(target_os = "windows")]
-	{
-		let cmd = Command::new("net")
-        .args(&["localgroup", &format!("{}", name)])
-		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
-		match cmd.ok() {
-			Some(o) => String::from_utf8_lossy(&o.stdout).contains(name),
-			None => false,
+	unsafe {
+		let mut group: GROUP_INFO_0 = null_mut();
+		let mut gname_utf16 = gname.encode_utf16().collect::<Vec<u16>>();
+
+		match NetGroupGetInfo(null, gname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
+			0 => { NetApiBufferFree(group as *mut c_void); Ok(true) },
+			(NERR_BASE+120) => Ok(false),
+			_ => Err(errno()),
 		}
 	}
 }
@@ -244,28 +263,62 @@ pub fn group_exists(name: &str) -> Result<bool, i32> {
 /// If it returns an [`Ok`] value, the both the user and group exist, and the payload contains if the user is in the group.
 /// If it returns an [`Err`] value, either the user or group doesn't exist
 pub fn user_is_in_group(uname: &str, gname: &str) -> Result<bool, i32> {
+	user_exists(uname)?;
+	group_exists(gname)?;
 	#[cfg(target_os = "linux")]
 	{
 		let group = GroupEntry::get_entry_from_group(gname)?;
-		user_exists(uname)?;
 		Ok(group.list.contains(&gname.to_string()))
 	}
 	#[cfg(target_os = "windows")]
 	{
-        let cmd = Command::new("net")
-        .args(&["localgroup", &format!("{}", gname)])
-		.stderr(Stdio::null()).stdout(Stdio::piped()).output();
-		match cmd.ok() {
-			Some(o) => {
-				let tmp = String::from_utf8_lossy(&o.stdout);
-                
-	    		if tmp.contains(gname) {
-					Ok(tmp.contains(uname))
-				} else {
-					Err(())
+		let mut groups: LPLOCALGROUP_USERS_INFO_0 = null_mut();
+		let mut uname_utf16 = uname.encode_utf16().collect::<Vec<u16>>();
+		let mut gname_utf16 = gname.encode_utf16().collect::<Vec<u16>>();
+		let mut num_entries = 0;
+		let mut tmp = 0;
+		uname_utf16.push(0);
+		gname_utf16.push(0);
+
+		let status = unsafe {
+			NetUserGetLocalGroups(null(), uname_utf16.as_ptr(), 0, 1, &mut groups as *mut *mut u8, u32::MAX, &mut entries, &mut tmp)
+		};
+		let entries = ManuallyDrop::new(Vec::from_raw_parts(groups, num_entries, num_entries));
+
+		if status == 0 {
+			let mut strlen = 0;
+			for c in gname_utf16.iter() {
+				if(*c == 0) {
+					break;
 				}
-			},
-			None => Err(()),
+				strlen += 1;
+			}
+
+			'groups: for raw_entry in (*entries).iter() {
+				let mut i = 0;
+				unsafe { 
+					while *raw_entry.lgrui0_name.offset(i) != 0 {
+						i += 1;
+					}
+				}
+
+				let entry = ManuallyDrop::new(Vec::from_raw_parts(raw_entry.lgrui0_name, i, i));
+				if i != strlen {
+					continue;
+				}
+
+				for j in 0..i {
+					if (*entry)[j] != gname_utf16[j] {
+						continue 'groups;
+					}
+				}
+
+				unsafe { NetApiBufferFree(groups as *mut c_void); }
+				return true;
+			}
+
+			unsafe { NetApiBufferFree(groups as *mut c_void); }
+			return false;
 		}
 	}
 }

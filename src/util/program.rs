@@ -24,7 +24,7 @@ pub enum TripleBool {
 /// On Windows, `name` should be the name of the exe file, to query the registry for.
 pub fn is_package_installed(name: &str) -> bool {
 	#[cfg(target_os = "linux")]
-	{
+ 	{
 		let dpkg_cmd = Command::new("dpkg").args(&["-l"]).stderr(Stdio::null()).stdout(Stdio::piped())
 			.output().expect("O no estamos en una distribución basada en Debian o algo está realmente mal.");
 
@@ -89,7 +89,7 @@ impl AppData {
 				{
 					let dpkg_cmd = Command::new("dpkg").args(&["-l"])
 					    .stderr(Stdio::null()).stdout(Stdio::piped())
-			            .output().expect("O no estamos en una distribución basada en Debian o algo está realmente mal.");
+			            .output().expect("O no estamos en una distribución basada en Debian o algo está muy mal.");
 
 					TripleBool::Known(String::from_utf8_lossy(&dpkg_cmd.stdout).contains(&self.name))
 				}
@@ -100,26 +100,20 @@ impl AppData {
 			},
 			#[cfg(target_os = "linux")]
 			InstallMethod::Flatpak => {
-				#[cfg(target_os = "linux")]
-				{
-					match Command::new("flatpak").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
-						Some(output) => {
-							TripleBool::Known(String::from_utf8_lossy(&output.stdout).contains(&self.name))
-						},
-						None => TripleBool::Unknown,
-					}
+				match Command::new("flatpak").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
+					Some(output) => {
+						TripleBool::Known(String::from_utf8_lossy(&output.stdout).contains(&self.name))
+					},
+					None => TripleBool::Unknown,
 				}
 			},
 			#[cfg(target_os = "linux")]
 			InstallMethod::Snap => {
-				#[cfg(target_os = "linux")]
-				{
-					match Command::new("snap").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
-						Some(output) => {
-							TripleBool::Known(String::from_utf8_lossy(&output.stdout).contains(&self.name))
-						},
-						None => TripleBool::Unknown,
-					}
+				match Command::new("snap").args(&["list"]).stdout(Stdio::piped()).output().ok() {
+					Some(output) => {
+						TripleBool::Known(String::from_utf8_lossy(&output.stdout).contains(&self.name))
+					},
+					None => TripleBool::Unknown,
 				}
 			},
 			#[cfg(target_os = "windows")]

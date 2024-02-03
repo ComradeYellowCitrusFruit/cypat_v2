@@ -17,7 +17,7 @@
 //! Here's an example of a stupidly simple scoring engine.
 //! ```rust
 //! use cypat::{scorer, engine, settings};
-//! use std::{fs::File, io::{BufRead, BufReader, Read}, string::{String, ToString}};
+//! use std::{fs::File, io::{BufRead, BufReader, Read}, string::{String, ToString}, thread::spawn};
 //! 
 //! fn main() {
 //!     let func = |x: Option<&mut file> | -> bool {
@@ -36,12 +36,13 @@
 //!             None => false,
 //!         }
 //!     };
-//! 
-//!     set_update_freq(1);
-//!     set_completed_update_freq(1);
-//!     add_file_vuln("example.txt", func);
-//! 
-//!     enter();
+//!     
+//!     let mut engine = Engine::new();
+//!     engine.add_file_vuln("world.txt", func);
+//!     engine.set_freq(2);
+//!     engine.set_completed_freq(10);
+//!     thread::spawn(|| {
+//!     });
 //! }
 //! ```
 
