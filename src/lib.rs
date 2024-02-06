@@ -16,15 +16,12 @@
 //! 
 //! Here's an example of a stupidly simple scoring engine.
 //! ```rust
-//! use cypat::{scorer, engine, settings};
-//! use std::{fs::File, io::{BufRead, BufReader, Read}, string::{String, ToString}, thread::spawn};
-//! 
 //! fn main() {
 //!     let func = |x: Option<&mut file> | -> bool {
 //!         match x {
 //!             Some(file) => {
-//!                 let mut string: String;
-//!                 BufReader::new(file.clone()).read_line(&mut string);
+//!                 let mut string: std::string::String;
+//!                 std::io::BufReader::new(file.clone()).read_line(&mut string);
 //! 
 //!                 if string == "Hello World" {
 //!                     add_score_entry(0, 50, "Wrote Hello World.".to_string());
@@ -37,12 +34,11 @@
 //!         }
 //!     };
 //!     
-//!     let mut engine = Engine::new();
+//!     let mut engine = cypat::Engine::new();
 //!     engine.add_file_vuln("world.txt", func);
 //!     engine.set_freq(2);
 //!     engine.set_completed_freq(10);
-//!     thread::spawn(|| {
-//!     });
+//!     engine.enter();
 //! }
 //! ```
 

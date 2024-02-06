@@ -291,5 +291,8 @@ impl Engine {
     /// If `blocking` is set, it will wait until the current running update stops to return.
     pub fn stop_engine(&mut self, blocking: bool) -> () {
         self.is_running.store(false, Ordering::SeqCst);
+        while blocking && self.in_execution.load(Ordering::SeqCst) {
+            () // in C I would have done a asm("nop")
+        }
     }
 }
