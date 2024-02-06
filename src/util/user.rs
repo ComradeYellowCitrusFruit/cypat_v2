@@ -20,7 +20,7 @@ use std::{
 use super::errno;
 
 #[cfg(target_os = "linux")]
-use libc::{gid_t, uid_t, sysconf, getpwnam_r, getgrnam_r, getgrouplist, strlen};
+use libc::{gid_t, uid_t, sysconf, getpwnam_r, getgrnam_r, getpwuid_r, getgrgid_r, getgrouplist, strlen};
 
 #[cfg(target_os = "windows")]
 use winapi::{
@@ -109,6 +109,39 @@ impl PasswdEntry {
 			}.clone())
 		}
 	}
+
+	pub fn get_entry_from_passwd_by_uid(uid: uid_t) -> Result<PasswdEntry, i32> {
+		unsafe {
+			let mut pass = MaybeUninit::zeroed().assume_init();
+        	let mut pass_ptr = MaybeUninit::zeroed().assume_init();
+        	let mut buf = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
+        	let mut res;
+			let tmp;
+        	res = getpwuid_r(uid, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+
+        	while res != 0 && errno() == libc::ERANGE {
+            	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
+            	buf.append(&mut nb);
+            	res = getpwuid_r(uid, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	}
+
+			if res != 0 {
+				return Err(errno());
+			}
+
+			tmp = pass_ptr.as_mut().unwrap();
+
+			Ok(PasswdEntry {
+				username: String::from_raw_parts(tmp.pw_name as *mut u8, libc::strlen(tmp.pw_name), libc::strlen(tmp.pw_name)),
+				uid: tmp.pw_uid,
+				gid: tmp.pw_gid,
+				password_in_shadow: *tmp.pw_passwd == 'x' as i8,
+				gecos: String::from_raw_parts(tmp.pw_gecos as *mut u8, libc::strlen(tmp.pw_gecos), libc::strlen(tmp.pw_gecos)),
+				home_dir: String::from_raw_parts(tmp.pw_dir as *mut u8, libc::strlen(tmp.pw_dir), libc::strlen(tmp.pw_dir)),
+				shell: String::from_raw_parts(tmp.pw_shell as *mut u8, libc::strlen(tmp.pw_shell), libc::strlen(tmp.pw_shell)),
+			}.clone())
+		}
+	}
 }
 
 #[cfg(target_os = "linux")]
@@ -132,6 +165,45 @@ impl GroupEntry {
             	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
             	buf.append(&mut nb);
             	res = getgrnam_r(groupname.as_ptr() as *const i8, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+        	}
+
+			if res != 0 {
+				return Err(errno());
+			}
+
+			tmp = pass_ptr.as_mut().unwrap();
+
+			ret = GroupEntry {
+				groupname: String::from_raw_parts(tmp.gr_name as *mut u8, libc::strlen(tmp.gr_name), libc::strlen(tmp.gr_name)),
+				gid: tmp.gr_gid,
+				list: Vec::new(),
+			};
+
+			let mut i = 0;
+			while tmp.gr_mem.offset(i).read() != null_mut() {
+				let tmp_tmp = tmp.gr_mem.offset(i).read() as *mut i8;
+				ret.list.push(String::from_raw_parts(tmp_tmp as *mut u8, libc::strlen(tmp_tmp), libc::strlen(tmp_tmp)));
+				i += 1;
+			}
+
+			Ok(ret.clone())
+		}
+	}
+
+	pub fn get_entry_by_gid(gid: gid_t) -> Result<GroupEntry, i32> {
+		unsafe {
+			let mut pass = MaybeUninit::zeroed().assume_init();
+        	let mut pass_ptr = MaybeUninit::zeroed().assume_init();
+        	let mut buf = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
+        	let mut res ;
+			let mut ret;
+			let tmp;
+        	res = getgrgid_r(gid, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
+
+        	while res != 0 && errno() == libc::ERANGE {
+            	let mut nb = vec![0i8; sysconf(libc::_SC_GETPW_R_SIZE_MAX) as usize];
+            	buf.append(&mut nb);
+            	res = getgrgid_r(gid, &mut pass, buf.as_mut_ptr(), buf.len(), &mut pass_ptr);
         	}
 
 			if res != 0 {

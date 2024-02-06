@@ -287,12 +287,13 @@ impl Engine {
     /// Tells the engine to exit.
     /// 
     /// This stops engine execution if [`Engine::enter`] was called.
-    /// Otherwise does nothing.
+    /// Otherwise does nothing, unless if `blocking` is set to true.
     /// If `blocking` is set, it will wait until the current running update stops to return.
-    pub fn stop_engine(&mut self, blocking: bool) -> () {
+    pub fn stop(&mut self, blocking: bool) -> () {
         self.is_running.store(false, Ordering::SeqCst);
+
         while blocking && self.in_execution.load(Ordering::SeqCst) {
-            () // in C I would have done a asm("nop")
+            std::hint::spin_loop(); // TODO: Optimize this shit
         }
     }
 }
