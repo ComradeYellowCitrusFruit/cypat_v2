@@ -58,7 +58,8 @@ pub struct PasswdEntry {
 impl PasswdEntry {
 	/// Parse a passwd entry from a string
 	pub fn parse_entry<T: ToString>(entry: &T) -> PasswdEntry {
-		let tokenized_entry: Vec<_> = entry.to_string().split(':').collect();
+		let entry_str = entry.to_string();
+		let tokenized_entry: Vec<_> = entry_str.split(':').collect();
 
 		PasswdEntry {
 			username: tokenized_entry[0].to_string(),
@@ -72,7 +73,7 @@ impl PasswdEntry {
 	}
 	
 	pub fn get_entry_from_passwd<T: ToString>(name: &T) -> Result<PasswdEntry, i32> {
-		let mut username = match CString::new(name.to_string()) {
+		let username = match CString::new(name.to_string()) {
 			Ok(s) => s,
 			_ => return Err(-1),
 		};
@@ -113,7 +114,7 @@ impl PasswdEntry {
 #[cfg(target_os = "linux")]
 impl GroupEntry {
 	pub fn get_entry_from_group<T: ToString>(name: &T) -> Result<GroupEntry, i32> {
-		let mut username = match CString::new(name.to_string()) {
+		let groupname = match CString::new(name.to_string()) {
 			Ok(s) => s,
 			_ => return Err(-1),
 		};
@@ -196,7 +197,7 @@ pub fn user_exists<T: ToString>(n: &T) -> Result<bool, i32> {
 
 		match NetGroupGetInfo(null, uname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
 			0 => { NetApiBufferFree(user as *mut c_void); Ok(true) },
-			(NERR_BASE+121) => Ok(false),
+			2220 => Ok(false), /* NERR_GroupNotFound */
 			_ => Err(errno()),
 		}
 	}
@@ -240,7 +241,7 @@ pub fn group_exists<T: ToString>(n: &T) -> Result<bool, i32> {
 
 		match NetGroupGetInfo(null, gname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
 			0 => { NetApiBufferFree(group as *mut c_void); Ok(true) },
-			(NERR_BASE+120) => Ok(false),
+			2220 => Ok(false),
 			_ => Err(errno()),
 		}
 	}
@@ -331,7 +332,7 @@ pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, ()> {
                 let cmd = Command::new("sudo")
                     .args(&["-l", "-U", &format!("{}", name.to_string())]).stderr(Stdio::null()).stdout(Stdio::piped())
 		            .output().expect("¿Por qué sudo no está trabajando?");
-                let mensaje = format!("User {} is not allowed to run sudo", name);
+                let mensaje = format!("User {} is not allowed to run sudo", name.to_string());
 
                 Ok(!String::from_utf8_lossy(&cmd.stdout).contains(&mensaje))
             } else {

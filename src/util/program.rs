@@ -29,13 +29,13 @@ pub fn is_package_installed<T: ToString>(name: &T) -> bool {
 		let dpkg_cmd = Command::new("dpkg").args(&["-l"]).stderr(Stdio::null()).stdout(Stdio::piped())
 			.output().expect("O no estamos en una distribución basada en Debian o algo está realmente mal.");
 
-		if String::from_utf8_lossy(&dpkg_cmd.stdout).contains(pkg_name) {
+		if String::from_utf8_lossy(&dpkg_cmd.stdout).contains(pkg_name.as_str()) {
 			return true;
 		}
 
 		match Command::new("flatpak").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
 			Some(output) => {
-				if String::from_utf8_lossy(&output.stdout).contains(pkg_name) {
+				if String::from_utf8_lossy(&output.stdout).contains(pkg_name.as_str()) {
 					return true;
 				}
 			},
@@ -44,7 +44,7 @@ pub fn is_package_installed<T: ToString>(name: &T) -> bool {
 
 		match Command::new("snap").args(&["list"]).stderr(Stdio::null()).stdout(Stdio::piped()).output().ok() {
 			Some(output) => {
-				if String::from_utf8_lossy(&output.stdout).contains(pkg_name) {
+				if String::from_utf8_lossy(&output.stdout).contains(pkg_name.as_str()) {
 					return true;
 				}
 			},
