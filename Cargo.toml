@@ -1,6 +1,6 @@
 [package]
 name = "cypat_scoring_engine"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Teresa Maria Rivera"]
 description = "A CyberPatriots scoring engine library"
 repository = "https://github.com/ComradeYellowCitrusFruit/cypat_v2"
@@ -19,7 +19,7 @@ crate-type = ["lib"]
 rustc_version = "0.4"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = "0.3.9"
+winapi = { version = "0.3.9", features = ["wincred", "lmaccess", "lmapibuf", "fileapi", "winnt", "handleapi", "accctrl", "aclapi"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2.152"

@@ -61,7 +61,7 @@ pub fn is_package_installed<T: ToString>(name: &T) -> bool {
 		match cmd.ok() {
 			Some(o) => {
 				let tmp = String::from_utf8_lossy(&o.stdout);
-	    		if tmp.contains(name.to_string()) {
+	    		if tmp.contains(&name.to_string()) {
 					true
 				} else {
 					false

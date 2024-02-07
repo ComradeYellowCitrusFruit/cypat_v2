@@ -8,7 +8,7 @@ use std::{
     sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc, Mutex},
     fs::File,
     io::{Seek, SeekFrom},
-    time::{Instant, Duration},
+    time::Duration,
     thread::sleep,
     str::FromStr,
     string::String,

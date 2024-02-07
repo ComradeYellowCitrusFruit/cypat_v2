@@ -26,7 +26,14 @@ use libc::{gid_t, uid_t, sysconf, getpwnam_r, getgrnam_r, getpwuid_r, getgrgid_r
 use winapi::{
 	um::{
 		wincred::NERR_BASE,
-		lmaccess::{NetUserGetLocalGroups, NetGroupGetInfo, LPLOCALGROUP_USERS_INFO_0}, 
+		lmaccess::{
+			NetUserGetLocalGroups, 
+			NetGroupGetInfo, 
+			LPLOCALGROUP_USERS_INFO_0, 
+			LOCALGROUP_USERS_INFO_0, 
+			LPUSER_INFO_0,
+			LPGROUP_INFO_0
+		}, 
 		lmapibuf::NetApiBufferFree
 	}, 
 	ctypes::c_void
@@ -264,10 +271,10 @@ pub fn user_exists<T: ToString>(n: &T) -> Result<bool, i32> {
 	}
 	#[cfg(target_os = "windows")]
 	unsafe {
-		let mut user: USER_INFO_0 = null_mut();
-		let mut uname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
+		let mut user: LPUSER_INFO_0 = null_mut();
+		let uname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
 
-		match NetGroupGetInfo(null, uname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
+		match NetGroupGetInfo(null(), uname_utf16.as_ptr(), 0, *&mut user as *mut *mut u8) {
 			0 => { NetApiBufferFree(user as *mut c_void); Ok(true) },
 			2220 => Ok(false), /* NERR_GroupNotFound */
 			_ => Err(errno()),
@@ -308,10 +315,10 @@ pub fn group_exists<T: ToString>(n: &T) -> Result<bool, i32> {
 	}
 	#[cfg(target_os = "windows")]
 	unsafe {
-		let mut group: GROUP_INFO_0 = null_mut();
-		let mut gname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
+		let mut group: LPGROUP_INFO_0 = null_mut();
+		let gname_utf16 = name.encode_utf16().collect::<Vec<u16>>();
 
-		match NetGroupGetInfo(null, gname_utf16.as_ptr(), 0, &mut group as *mut *mut u8) {
+		match NetGroupGetInfo(null(), gname_utf16.as_ptr(), 0, *&mut group as *mut *mut u8) {
 			0 => { NetApiBufferFree(group as *mut c_void); Ok(true) },
 			2220 => Ok(false),
 			_ => Err(errno()),
@@ -332,7 +339,7 @@ pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, 
 		Ok(group.list.contains(&g.to_string()))
 	}
 	#[cfg(target_os = "windows")]
-	{
+	unsafe {
 		let uname = u.to_string();
 		let gname = g.to_string();
 		let mut groups: LPLOCALGROUP_USERS_INFO_0 = null_mut();
@@ -343,15 +350,13 @@ pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, 
 		uname_utf16.push(0);
 		gname_utf16.push(0);
 
-		let status = unsafe {
-			NetUserGetLocalGroups(null(), uname_utf16.as_ptr(), 0, 1, &mut groups as *mut *mut u8, u32::MAX, &mut entries, &mut tmp)
-		};
-		let entries = ManuallyDrop::new(Vec::from_raw_parts(groups, num_entries, num_entries));
+		let status = NetUserGetLocalGroups(null(), uname_utf16.as_ptr(), 0, 1, *&mut groups as *mut *mut u8, u32::MAX, &mut num_entries, &mut tmp);
+		let entries = ManuallyDrop::new(Vec::<LOCALGROUP_USERS_INFO_0>::from_raw_parts(groups, num_entries as usize, num_entries as usize));
 
 		if status == 0 {
 			let mut strlen = 0;
 			for c in gname_utf16.iter() {
-				if(*c == 0) {
+				if *c == 0 {
 					break;
 				}
 				strlen += 1;
@@ -359,29 +364,29 @@ pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, 
 
 			'groups: for raw_entry in (*entries).iter() {
 				let mut i = 0;
-				unsafe { 
-					while *raw_entry.lgrui0_name.offset(i) != 0 {
-						i += 1;
-					}
+				while *raw_entry.lgrui0_name.offset(i) != 0 {
+					i += 1;
 				}
 
-				let entry = ManuallyDrop::new(Vec::from_raw_parts(raw_entry.lgrui0_name, i, i));
+				let entry = ManuallyDrop::new(Vec::from_raw_parts(raw_entry.lgrui0_name, i as usize, i as usize));
 				if i != strlen {
 					continue;
 				}
 
 				for j in 0..i {
-					if (*entry)[j] != gname_utf16[j] {
+					if entry[j as usize] != gname_utf16[j as usize] {
 						continue 'groups;
 					}
 				}
 
-				unsafe { NetApiBufferFree(groups as *mut c_void); }
-				return true;
+				NetApiBufferFree(groups as *mut c_void);
+				return Ok(true);
 			}
 
-			unsafe { NetApiBufferFree(groups as *mut c_void); }
-			return false;
+			NetApiBufferFree(groups as *mut c_void);
+			return Ok(false);
+		} else {
+			Err(errno())
 		}
 	}
 }
@@ -393,7 +398,7 @@ pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, 
 /// 
 /// If it returns an [`Ok`] value, the user exists and the payload contians if the user has admin privileges
 /// If it returns an [`Err`] value, the user does not exist
-pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, ()> {
+pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, i32> {
 
     #[cfg(target_os = "linux")]
     {
@@ -408,12 +413,12 @@ pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, ()> {
 
                 Ok(!String::from_utf8_lossy(&cmd.stdout).contains(&mensaje))
             } else {
-                Err(())
+                Err(errno())
             }
         }
     }
     #[cfg(target_os = "windows")]
     {
-        user_is_in_group(name, "Administrators")
+        user_is_in_group(name, &"Administrators")
     }
 }
