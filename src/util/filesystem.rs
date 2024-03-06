@@ -4,10 +4,19 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-use std::{ptr::{null_mut, null}, result::Result, str::FromStr};
+use std::{
+    ptr::{null_mut, null}, 
+    result::Result, 
+    str::FromStr,
+    mem::MaybeUninit,
+};
+
+#[cfg(target_os = "linux")]
+use std::ffi::CString;
 
 #[cfg(target_os = "linux")]
 use libc::{uid_t, gid_t, stat, getpwnam_r, sysconf, getgrnam_r};
+
 #[cfg(target_os = "linux")]
 use super::{PasswdEntry, GroupEntry};
 

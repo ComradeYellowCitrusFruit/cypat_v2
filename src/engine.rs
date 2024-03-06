@@ -28,12 +28,6 @@ pub enum InstallMethod {
     ManualInstall,
 }
 
-#[derive(Clone)]
-pub(crate) struct FileData {
-    pub(crate) name: String,
-    pub(crate) position: u64
-}
-
 /// Contains some simple data regarding applications or packages
 /// 
 /// Contains some basic information regarding applications or packages.
@@ -50,7 +44,7 @@ pub(crate) struct UserData {
 }
 
 pub(crate) enum Condition {
-    FileVuln(FileData, Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>),
+    FileVuln(String, Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>),
     AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
     UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
     CustomVuln(Box<dyn FnMut(()) -> bool + Send + Sync>),
@@ -58,8 +52,8 @@ pub(crate) enum Condition {
 
 pub struct Engine {
     is_running: AtomicBool,
-    score: Arc<Mutex<Vec<(u64, i32, String)>>>,
-    vulns: Arc<Mutex<Vec<(Condition, bool)>>>,
+    score: Mutex<Vec<(u64, i32, String)>>,
+    vulns: Mutex<Vec<(Condition, bool)>>,
     incomplete_freq: AtomicU64,
     complete_freq: AtomicU64,
     in_execution: AtomicBool,
@@ -69,8 +63,8 @@ impl Engine {
     pub fn new() -> Engine {
         Engine {
             is_running: AtomicBool::new(false),
-            score: Arc::new(Mutex::new(Vec::new())),
-            vulns: Arc::new(Mutex::new(Vec::new())),
+            score: Mutex::new(Vec::new()),
+            vulns: Mutex::new(Vec::new()),
             incomplete_freq: AtomicU64::new(5),
             complete_freq: AtomicU64::new(10),
             in_execution: AtomicBool::new(false),
@@ -78,7 +72,7 @@ impl Engine {
     }
 
     pub(crate) fn add_vuln(&mut self, vuln: Condition) {
-        match (*self.vulns).lock() {
+        match self.vulns.lock() {
             Ok(mut g) => g.push((vuln, false)),
             Err(g) => panic!("{}", g),
         }
@@ -91,16 +85,12 @@ impl Engine {
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]
-    pub fn add_file_vuln<F>(&mut self, name: &str, f: F)
+    pub fn add_file_vuln<F, S>(&mut self, name: S, f: F)
     where 
         F: FnMut(Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        S: ToString,
     {
-        let fd = FileData {
-            name: String::from_str(name).unwrap(),
-            position: 0,
-        };
-
-        self.add_vuln(Condition::FileVuln(fd, Box::new(f) as Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>));
+        self.add_vuln(Condition::FileVuln(name.to_string(), Box::new(f) as Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>));
     }
 
     /// Register a package/app vulnerability
@@ -110,12 +100,13 @@ impl Engine {
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]    
-    pub fn add_app_vuln<F>(&mut self, name: &str, install_method: InstallMethod, f: F)
+    pub fn add_app_vuln<F, S>(&mut self, name: S, install_method: InstallMethod, f: F)
     where 
         F: FnMut(AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        S: ToString,
     {
         let ad = AppData {
-            name: String::from_str(name).unwrap(),
+            name: name.to_string(),
             install_method: install_method,
         };
 
@@ -129,12 +120,13 @@ impl Engine {
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]
-    pub fn add_user_vuln<F>(&mut self, name: &str, f: F)
+    pub fn add_user_vuln<F, S>(&mut self, name: S, f: F)
     where 
         F: FnMut(&str) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        S: ToString,
     {
         let ud = UserData {
-            name: String::from_str(name).unwrap(),
+            name: name.to_string(),
         };
 
         self.add_vuln(Condition::UserVuln(ud, Box::new(f) as Box<dyn FnMut(&str) -> bool + Send + Sync>));
@@ -176,7 +168,17 @@ impl Engine {
     /// Adds an entry to the score report, with an ID, a score value, and an explanation
     pub fn add_score(&mut self, id: u64, add: i32, reason: String) {
         match self.score.lock() {
-            Ok(mut g) => (*g).push((id, add, reason)),
+            Ok(mut g) => { 
+                for s in g.iter_mut() {
+                    if s.0 == id {
+                        s.1 = add;
+                        s.2 = reason;
+                        return;
+                    }
+                }
+
+                g.push((id, add, reason));
+            },
             Err(g) => panic!("{}", g),
         }
     }
@@ -191,6 +193,7 @@ impl Engine {
                         return Ok(());
                     }
                 }
+
                 Err(())
             },
             Err(g) => panic!("{}", g),
@@ -217,17 +220,11 @@ impl Engine {
     fn handle_vulnerability(vuln: &mut (Condition, bool)) {
         match &mut vuln.0 {
             Condition::FileVuln(d, f) => {
-                let pf = File::open(d.name.clone()).ok();
+                let pf = File::open(d.clone()).ok();
 
                 match pf {
-                    Some(mut file) => {
-                        let _ = file.seek(SeekFrom::Start(d.position));
-                        vuln.1 = f(Some(&mut file));
-                        d.position = file.stream_position().unwrap();
-                    },
-                    None => {
-                        vuln.1 = f(None);
-                 },
+                    Some(mut file) => vuln.1 = f(Some(&mut file)),
+                    None => vuln.1 = f(None),
                 }
             },
             Condition::AppVuln(a, f) => {
