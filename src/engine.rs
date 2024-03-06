@@ -57,9 +57,13 @@ pub struct Engine {
     incomplete_freq: AtomicU64,
     complete_freq: AtomicU64,
     in_execution: AtomicBool,
+    step_iter: AtomicU64,
 }
 
 impl Engine {
+    /// Create a new engine
+    /// 
+    /// Create a new engine, using default values, and no scores or vulnerabilities.
     pub fn new() -> Engine {
         Engine {
             is_running: AtomicBool::new(false),
@@ -68,6 +72,7 @@ impl Engine {
             incomplete_freq: AtomicU64::new(5),
             complete_freq: AtomicU64::new(10),
             in_execution: AtomicBool::new(false),
+            step_iter: AtomicU64::new(0),
         }
     }
 
@@ -166,6 +171,9 @@ impl Engine {
     }
 
     /// Adds an entry to the score report, with an ID, a score value, and an explanation
+    /// 
+    /// Adds an entry to the score report, with an ID, a score value, and an explanation.
+    /// If an entry exists with the same ID, it instead changes the score and explanation
     pub fn add_score(&mut self, id: u64, add: i32, reason: String) {
         match self.score.lock() {
             Ok(mut g) => { 
@@ -242,13 +250,13 @@ impl Engine {
     /// Executes vulnerabilites
     ///
     /// Incomplete vulnerabilites are excuted each time the function is executed.
-    /// Complete vulnerabilites are excuted only if `iter` mod [`complete_freq`][`Engine::set_completed_freq`] is 0
-    pub fn update(&mut self, iter: u64) -> () {
+    /// Complete vulnerabilites are excuted only if the number of iterations mod [`complete_freq`][`Engine::set_completed_freq`] is 0
+    pub fn update(&mut self) -> () {
         self.in_execution.store(true, Ordering::SeqCst);
         match self.vulns.lock() {
             Ok(mut g) => {
                 for vuln in (*g).iter_mut() {
-                    if iter % self.complete_freq.load(Ordering::SeqCst) == 0 && vuln.1 {
+                    if self.step_iter.load(Ordering::SeqCst) % self.complete_freq.load(Ordering::SeqCst) == 0 && vuln.1 {
                         Self::handle_vulnerability(vuln);
                     } else {
                         Self::handle_vulnerability(vuln);
@@ -263,19 +271,16 @@ impl Engine {
     /// Start engine execution on this thread
     /// 
     /// This enters an loop that calls [`Engine::update`] [`incomplete_freq`][`Engine::set_freq`] times per second.
-    /// The value of `cur_iter` passed to [`Engine::update`] is a variable incremented every time the loop is executed
     /// 
     /// This state of execution only takes control of one thread, and other threads can generally continue without issue,
-    /// however new vulnerabilities cannot be added.
+    /// however, new vulnerabilities cannot be added.
     pub fn enter(&mut self) -> () {
-        let mut iterations = 0;
 
         self.is_running.store(true, Ordering::SeqCst);
         // TODO: init
     
         while self.is_running.load(Ordering::SeqCst) {
-            self.update(iterations);
-            iterations += 1;
+            self.update();
 
             sleep(Duration::from_secs_f32(1.0/(self.incomplete_freq.load(Ordering::SeqCst) as f32)));
         }
@@ -291,6 +296,48 @@ impl Engine {
 
         while blocking && self.in_execution.load(Ordering::SeqCst) {
             std::hint::spin_loop(); // TODO: Optimize this shit
+        }
+    }
+
+    /// Calculate a total score
+    /// 
+    /// Calculate the total score for the current engine.
+    pub fn calc_total_score(&self) -> i32 {
+        match self.score.lock() {
+            Ok(guard) => guard.iter().fold(0, |acc, (_, i, _)| acc + i),
+            Err(g) => panic!("{}", g),
+        }
+    }
+
+    /// Get the entry identified by id, if it exists.
+    pub fn get_entry(&self, id: u64) -> Option<(u64, i32, String)> {
+        match self.score.lock() {
+            Ok(guard) => {
+                for i in guard.iter() {
+                    if id == i.0 {
+                        return Some(i.clone())
+                    }
+                }
+
+                None
+            },
+            Err(g) => panic!("{}", g),
+        }
+    }
+
+    /// Checks if the entry identified by id exists
+    pub fn entry_exists(&self, id: u64) -> bool {
+        match self.score.lock() {
+            Ok(guard) => {
+                for i in guard.iter() {
+                    if id == i.0 {
+                        return true;
+                    }
+                }
+
+                false
+            },
+            Err(g) => panic!("{}", g),
         }
     }
 }
