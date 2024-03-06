@@ -79,6 +79,7 @@ impl PasswdEntry {
 		}
 	}
 	
+	/// Get the entry from the password database
 	pub fn get_entry_from_passwd<T: ToString>(name: &T) -> Result<PasswdEntry, i32> {
 		let username = match CString::new(name.to_string()) {
 			Ok(s) => s,
@@ -117,6 +118,7 @@ impl PasswdEntry {
 		}
 	}
 
+	/// Get the entry from the password database by uid
 	pub fn get_entry_from_passwd_by_uid(uid: uid_t) -> Result<PasswdEntry, i32> {
 		unsafe {
 			let mut pass = MaybeUninit::zeroed().assume_init();
@@ -153,6 +155,7 @@ impl PasswdEntry {
 
 #[cfg(target_os = "linux")]
 impl GroupEntry {
+	/// Get the entry from the group database
 	pub fn get_entry_from_group<T: ToString>(name: &T) -> Result<GroupEntry, i32> {
 		let groupname = match CString::new(name.to_string()) {
 			Ok(s) => s,
@@ -197,6 +200,7 @@ impl GroupEntry {
 		}
 	}
 
+	/// Get the entry from the group database by GID
 	pub fn get_entry_by_gid(gid: gid_t) -> Result<GroupEntry, i32> {
 		unsafe {
 			let mut pass = MaybeUninit::zeroed().assume_init();
@@ -238,7 +242,6 @@ impl GroupEntry {
 }
 
 /// Checks if a user with username `name` exists on the system
-
 pub fn user_exists<T: ToString>(n: &T) -> Result<bool, i32> {
 	let name = n.to_string();
 	#[cfg(target_os = "linux")]
@@ -408,7 +411,7 @@ pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, i32> {
             if user_exists(name).unwrap_or(false) {
                 let cmd = Command::new("sudo")
                     .args(&["-l", "-U", &format!("{}", name.to_string())]).stderr(Stdio::null()).stdout(Stdio::piped())
-		            .output().expect("¿Por qué sudo no está trabajando?");
+		            .output().expect("Sudo failed to run.");
                 let mensaje = format!("User {} is not allowed to run sudo", name.to_string());
 
                 Ok(!String::from_utf8_lossy(&cmd.stdout).contains(&mensaje))

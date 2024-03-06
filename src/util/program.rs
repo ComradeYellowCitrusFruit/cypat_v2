@@ -73,19 +73,20 @@ pub fn is_package_installed<T: ToString>(name: &T) -> bool {
 }
 
 impl AppData {
+	/// Create a new app data
 	pub fn new<T: ToString>(name: &T, install_method: InstallMethod) -> Self {
 		Self { name: name.to_string(), install_method: install_method }
 	}
 
 	/// Checks if a package is installed
 	/// 
-	/// For WinGet, APT ([`InstallMethod::Default`] on Linux, aka [`InstallMethod::SystemPackageManager`]), [`InstallMethod::Flatpak`], and [`InstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
-	/// For [`InstallMethod::SystemPackageManager`]/[`InstallMethod::Default`] on Windows, this just calls [`is_package_installed`]. \
+	/// For WinGet, APT ([`InstallMethod::Default`] on Linux, aka [`InstallMethod::PackageManager`]), [`InstallMethod::Flatpak`], and [`InstallMethod::Snap`] packages, it uses `self.name` to query said package managers. \
+	/// For [`InstallMethod::PackageManager`]/[`InstallMethod::Default`] on Windows, this just calls [`is_package_installed`]. \
 	/// For anything else, it default returns [`TripleBool::Unknown`]
 	pub fn is_installed(&self) -> TripleBool {
 
 		match self.install_method {
-			InstallMethod::Default | InstallMethod::SystemPackageManager => {
+			InstallMethod::Default | InstallMethod::PackageManager => {
 				#[cfg(target_os = "linux")]
 				{
 					let dpkg_cmd = Command::new("dpkg").args(&["-l"])

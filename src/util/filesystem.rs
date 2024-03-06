@@ -15,7 +15,7 @@ use std::{
 use std::ffi::CString;
 
 #[cfg(target_os = "linux")]
-use libc::{uid_t, gid_t, stat, getpwnam_r, sysconf, getgrnam_r};
+use libc::{uid_t, gid_t, stat};
 
 #[cfg(target_os = "linux")]
 use super::{PasswdEntry, GroupEntry};
@@ -55,6 +55,7 @@ pub fn file_owned_by_group<A: ToString, B: ToString>(g: &A, f: &B) -> Result<boo
     Ok(get_file_owner::<B, String>(f)? == g.to_string())
 }
 
+/// Gets the UID of the owner of the file
 #[cfg(target_os = "linux")]
 pub fn get_file_owner_uid<T: ToString>(f: &T) -> Result<uid_t, i32> {
     let filename = match CString::new(f.to_string()) {
@@ -72,6 +73,7 @@ pub fn get_file_owner_uid<T: ToString>(f: &T) -> Result<uid_t, i32> {
     }
 }
 
+/// Gets the GID of the owner of the file
 #[cfg(target_os = "linux")]
 pub fn get_file_owner_gid<T: ToString>(f: &T) -> Result<gid_t, i32> {
     let filename = match CString::new(f.to_string()) {
@@ -89,6 +91,7 @@ pub fn get_file_owner_gid<T: ToString>(f: &T) -> Result<gid_t, i32> {
     }
 }
 
+/// Get the group owner of the file
 #[cfg(target_os = "linux")]
 pub fn get_file_group<A: ToString, B: FromStr>(f: &A) -> Result<B, i32> {
     let uid = get_file_owner_gid(f)?;
@@ -99,6 +102,7 @@ pub fn get_file_group<A: ToString, B: FromStr>(f: &A) -> Result<B, i32> {
     }
 }
 
+/// Get the owner of the file
 pub fn get_file_owner<A: ToString, B: FromStr>(f: &A) -> Result<B, i32> {
     #[cfg(target_os = "linux")]
     {
@@ -109,6 +113,7 @@ pub fn get_file_owner<A: ToString, B: FromStr>(f: &A) -> Result<B, i32> {
             _ => Err(-1)
         }
     }
+
     #[cfg(target_os = "windows")]
     unsafe {
         let h = CreateFileW(

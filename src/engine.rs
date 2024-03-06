@@ -4,13 +4,47 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
+//! # The Engine Structure itself
+//! 
+//! This is the main module of this library.
+//! It contains the [`Engine`] type, and some supporting structs and enums, [`AppData`], and [`InstallMethod`].
+//! 
+//! ## Examples
+//! 
+//! Here's an example of a stupidly simple scoring engine.
+//! ```rust
+//! fn main() {
+//!     let mut engine = std::sync::Arc::new(cypat::Engine::new());
+//!     let tmp_engine = Arc::clone(&engine);
+//!     let func = move |x: Option<&mut file> | -> bool {
+//!         match x {
+//!             Some(file) => {
+//!                 let mut string: std::string::String;
+//!                 std::io::BufReader::new(file.clone()).read_line(&mut string);
+//! 
+//!                 if string == "Hello World" {
+//!                     tmp_engine.add_score_entry(0, 50, "Wrote Hello World.".to_string());
+//!                     true
+//!                 } else {
+//!                     false
+//!                 }
+//!             },
+//!             None => false,
+//!         }
+//!     };
+//!     
+//!     engine.add_file_vuln("world.txt", func);
+//!     engine.set_freq(2);
+//!     engine.set_completed_freq(10);
+//!     engine.enter();
+//! }
+//! ```
+
 use std::{
-    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc, Mutex},
+    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Mutex},
     fs::File,
-    io::{Seek, SeekFrom},
     time::Duration,
     thread::sleep,
-    str::FromStr,
     string::String,
 };
 
@@ -18,7 +52,7 @@ use std::{
 #[derive(Clone, Copy)]
 pub enum InstallMethod {
     Default,
-    SystemPackageManager,
+    PackageManager,
     #[cfg(target_os = "windows")]
     WinGet,
     #[cfg(target_os = "linux")]
