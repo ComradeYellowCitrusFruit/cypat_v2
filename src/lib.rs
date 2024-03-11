@@ -18,7 +18,7 @@
 //! ```rust
 //! fn main() {
 //!     let mut engine = cypat::Engine::new();
-//!     let func = move |e, x| -> bool {
+//!     engine.add_file_vuln("world.txt", move |e, x| -> bool {
 //!         match x {
 //!             Some(file) => {
 //!                 let mut string: std::string::String;
@@ -33,9 +33,14 @@
 //!             },
 //!             None => false,
 //!         }
-//!     };
-//!     
-//!     engine.add_file_vuln("world.txt", func);
+//!     });
+//! 
+//!     engine.add_hook(|x| {
+//!         if x.entry_exists(0) {
+//!             x.stop(false);
+//!         }
+//!     });
+//! 
 //!     engine.set_freq(2);
 //!     engine.set_completed_freq(10);
 //!     engine.enter();

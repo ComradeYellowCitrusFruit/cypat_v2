@@ -15,7 +15,7 @@
 //! ```rust
 //! fn main() {
 //!     let mut engine = cypat::Engine::new();
-//!     let func = move |e, x| -> bool {
+//!     engine.add_file_vuln("world.txt", move |e, x| -> bool {
 //!         match x {
 //!             Some(file) => {
 //!                 let mut string: std::string::String;
@@ -30,9 +30,14 @@
 //!             },
 //!             None => false,
 //!         }
-//!     };
-//!     
-//!     engine.add_file_vuln("world.txt", func);
+//!     });
+//! 
+//!     engine.add_hook(|x| {
+//!         if x.entry_exists(0) {
+//!             x.stop(false);
+//!         }
+//!     });
+//! 
 //!     engine.set_freq(2);
 //!     engine.set_completed_freq(10);
 //!     engine.enter();
@@ -123,7 +128,7 @@ impl Engine {
     /// Register a file vulnerability
     /// 
     /// Register a file vulnerability.
-    /// This takes the form of a function/closure that takes an [`Option<&mut File>`] as it's only parameter, and returns a [`bool`].
+    /// This takes the form of a function/closure that takes an [`&mut Engine`][`Engine`], and a [`Option<&mut File>`], and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]
@@ -138,7 +143,7 @@ impl Engine {
     /// Register a package/app vulnerability
     /// 
     /// Register a package/app vulnerability.
-    /// This takes the form of a function/closure that takes an [`AppData`] as it's only parameter, and returns a [`bool`].
+    /// This takes the form of a function/closure that takes an [`&mut Engine`][`Engine`], and an [`AppData`], and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]    
@@ -158,7 +163,7 @@ impl Engine {
     /// Register a user vulnerability
     /// 
     /// Register a user vulnerability.
-    /// This takes the form of a function/closure that takes an [`str`] as it's only parameter, and returns a [`bool`].
+    /// This takes the form of a function/closure that takes a [`&mut Engine`][`Engine`], and a [`str`], and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]
@@ -177,7 +182,7 @@ impl Engine {
     /// Register a miscellaneous vulnerability
     /// 
     /// Register a miscellaneous vulnerability.
-    /// This takes the form of a function/closure that takes no parameters, and returns a [`bool`].
+    /// This takes the form of a function/closure that takes only a [`&mut Engine`][`Engine`], and returns a [`bool`].
     /// 
     /// If the closure returns true, the vulnerability is interpreted as being completed, it is incomplete.
     /// More on that in [`Engine::update`] and [`Engine::enter`]
@@ -186,6 +191,22 @@ impl Engine {
         F: FnMut(&mut Self) -> bool + Send + Sync + 'static,
     {
         self.add_vuln(Condition::CustomVuln(Box::new(f) as Box<dyn FnMut(&mut Self) -> bool + Send + Sync>));
+    }
+
+    /// Register a hook vulnerability
+    /// 
+    /// Register a hook vulnerability, which takes the form of a closure that takes a [`&mut Engine`][`Engine`] as it's only parameter.
+    /// In reality this registers a miscellaneous vulnerability (see [`Engine::add_misc_vuln`]).
+    /// This miscellaneous vulnerability is literally just a call to the hook that discards it's return, and returns false.
+    pub fn add_hook<F, T>(&mut self, f: F)
+    where
+        F: FnMut(&mut Self) -> T + Send + Sync + 'static,
+    {
+        let mut boxed_f = Box::new(f);
+        self.add_misc_vuln(move |x: &mut Engine| {
+            let _ = boxed_f(x);
+            false
+        })
     }
 
     /// Sets the frequency in seconds at which the engine is updated.
