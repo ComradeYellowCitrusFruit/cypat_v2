@@ -4,7 +4,7 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-//! # The Engine Structure itself
+//! The Engine Structure itself
 //! 
 //! This is the main module of this library.
 //! It contains the [`Engine`] type, and some supporting structs and enums, [`AppData`], and [`InstallMethod`].
@@ -14,16 +14,15 @@
 //! Here's an example of a stupidly simple scoring engine.
 //! ```rust
 //! fn main() {
-//!     let mut engine = std::sync::Arc::new(cypat::Engine::new());
-//!     let tmp_engine = Arc::clone(&engine);
-//!     let func = move |x: Option<&mut file> | -> bool {
+//!     let mut engine = cypat::Engine::new();
+//!     let func = move |e, x| -> bool {
 //!         match x {
 //!             Some(file) => {
 //!                 let mut string: std::string::String;
 //!                 std::io::BufReader::new(file.clone()).read_line(&mut string);
 //! 
 //!                 if string == "Hello World" {
-//!                     tmp_engine.add_score_entry(0, 50, "Wrote Hello World.".to_string());
+//!                     e.add_score_entry(0, 50, "Wrote Hello World.".to_string());
 //!                     true
 //!                 } else {
 //!                     false
@@ -41,11 +40,15 @@
 //! ```
 
 use std::{
-    sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Mutex},
-    fs::File,
-    time::Duration,
-    thread::sleep,
-    string::String,
+    fs::File, 
+    string::String, 
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering}, 
+        Arc, 
+        Mutex
+    }, 
+    thread::sleep, 
+    time::Duration
 };
 
 /// Contains package install method.
@@ -78,16 +81,16 @@ pub(crate) struct UserData {
 }
 
 pub(crate) enum Condition {
-    FileVuln(String, Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>),
-    AppVuln(AppData, Box<dyn FnMut(AppData) -> bool + Send + Sync>),
-    UserVuln(UserData, Box<dyn FnMut(&str) -> bool + Send + Sync>),
-    CustomVuln(Box<dyn FnMut(()) -> bool + Send + Sync>),
+    FileVuln(String, Box<dyn FnMut(&mut Engine, Option<&mut File>) -> bool + Send + Sync>),
+    AppVuln(AppData, Box<dyn FnMut(&mut Engine, AppData) -> bool + Send + Sync>),
+    UserVuln(UserData, Box<dyn FnMut(&mut Engine, &str) -> bool + Send + Sync>),
+    CustomVuln(Box<dyn FnMut(&mut Engine) -> bool + Send + Sync>),
 }
 
 pub struct Engine {
     is_running: AtomicBool,
-    score: Mutex<Vec<(u64, i32, String)>>,
-    vulns: Mutex<Vec<(Condition, bool)>>,
+    score: Arc<Mutex<Vec<(u64, i32, String)>>>,
+    vulns: Arc<Mutex<Vec<(Condition, bool)>>>,
     incomplete_freq: AtomicU64,
     complete_freq: AtomicU64,
     in_execution: AtomicBool,
@@ -101,8 +104,8 @@ impl Engine {
     pub fn new() -> Engine {
         Engine {
             is_running: AtomicBool::new(false),
-            score: Mutex::new(Vec::new()),
-            vulns: Mutex::new(Vec::new()),
+            score: Arc::new(Mutex::new(Vec::new())),
+            vulns: Arc::new(Mutex::new(Vec::new())),
             incomplete_freq: AtomicU64::new(5),
             complete_freq: AtomicU64::new(10),
             in_execution: AtomicBool::new(false),
@@ -126,10 +129,10 @@ impl Engine {
     /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_file_vuln<F, S>(&mut self, name: S, f: F)
     where 
-        F: FnMut(Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        F: FnMut(&mut Self, Option<&mut File>) -> bool + Send + Sync + 'static, // Whiny ass compiler
         S: ToString,
     {
-        self.add_vuln(Condition::FileVuln(name.to_string(), Box::new(f) as Box<dyn FnMut(Option<&mut File>) -> bool + Send + Sync>));
+        self.add_vuln(Condition::FileVuln(name.to_string(), Box::new(f) as Box<dyn FnMut(&mut Self, Option<&mut File>) -> bool + Send + Sync>));
     }
 
     /// Register a package/app vulnerability
@@ -141,7 +144,7 @@ impl Engine {
     /// More on that in [`Engine::update`] and [`Engine::enter`]    
     pub fn add_app_vuln<F, S>(&mut self, name: S, install_method: InstallMethod, f: F)
     where 
-        F: FnMut(AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        F: FnMut(&mut Self, AppData) -> bool + Send + Sync + 'static, // Whiny ass compiler
         S: ToString,
     {
         let ad = AppData {
@@ -149,7 +152,7 @@ impl Engine {
             install_method: install_method,
         };
 
-        self.add_vuln(Condition::AppVuln(ad, Box::new(f) as Box<dyn FnMut(AppData) -> bool + Send + Sync>));
+        self.add_vuln(Condition::AppVuln(ad, Box::new(f) as Box<dyn FnMut(&mut Self, AppData) -> bool + Send + Sync>));
     }
 
     /// Register a user vulnerability
@@ -161,14 +164,14 @@ impl Engine {
     /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_user_vuln<F, S>(&mut self, name: S, f: F)
     where 
-        F: FnMut(&str) -> bool + Send + Sync + 'static, // Whiny ass compiler
+        F: FnMut(&mut Self, &str) -> bool + Send + Sync + 'static, // Whiny ass compiler
         S: ToString,
     {
         let ud = UserData {
             name: name.to_string(),
         };
 
-        self.add_vuln(Condition::UserVuln(ud, Box::new(f) as Box<dyn FnMut(&str) -> bool + Send + Sync>));
+        self.add_vuln(Condition::UserVuln(ud, Box::new(f) as Box<dyn FnMut(&mut Self, &str) -> bool + Send + Sync>));
     }
 
     /// Register a miscellaneous vulnerability
@@ -180,9 +183,9 @@ impl Engine {
     /// More on that in [`Engine::update`] and [`Engine::enter`]
     pub fn add_misc_vuln<F>(&mut self, f: F)
     where
-        F: FnMut(()) -> bool + Send + Sync + 'static,
+        F: FnMut(&mut Self) -> bool + Send + Sync + 'static,
     {
-        self.add_vuln(Condition::CustomVuln(Box::new(f) as Box<dyn FnMut(()) -> bool + Send + Sync>));
+        self.add_vuln(Condition::CustomVuln(Box::new(f) as Box<dyn FnMut(&mut Self) -> bool + Send + Sync>));
     }
 
     /// Sets the frequency in seconds at which the engine is updated.
@@ -259,24 +262,24 @@ impl Engine {
         }
     }
 
-    fn handle_vulnerability(vuln: &mut (Condition, bool)) {
+    fn handle_vulnerability(&mut self, vuln: &mut (Condition, bool)) {
         match &mut vuln.0 {
             Condition::FileVuln(d, f) => {
                 let pf = File::open(d.clone()).ok();
 
                 match pf {
-                    Some(mut file) => vuln.1 = f(Some(&mut file)),
-                    None => vuln.1 = f(None),
+                    Some(mut file) => vuln.1 = f(self, Some(&mut file)),
+                    None => vuln.1 = f(self, None),
                 }
             },
             Condition::AppVuln(a, f) => {
-                vuln.1 = f(a.clone());
+                vuln.1 = f(self, a.clone());
             },
             Condition::UserVuln(u, f) => {
-                vuln.1 = f(u.name.as_str());
+                vuln.1 = f(self, u.name.as_str());
             },
             Condition::CustomVuln(f) => {
-                vuln.1 = f(());
+                vuln.1 = f(self);
             },
         }
     }
@@ -287,18 +290,22 @@ impl Engine {
     /// Complete vulnerabilites are excuted only if the number of iterations mod [`complete_freq`][`Engine::set_completed_freq`] is 0
     pub fn update(&mut self) -> () {
         self.in_execution.store(true, Ordering::SeqCst);
-        match self.vulns.lock() {
-            Ok(mut g) => {
-                for vuln in (*g).iter_mut() {
+        let tmp_vulns = Arc::clone(&self.vulns); 
+        
+        // Neat trick to get out of immutable borrow complaints
+        match tmp_vulns.lock() {
+            Ok(mut vulns) => {
+                for vuln in vulns.iter_mut() {
                     if self.step_iter.load(Ordering::SeqCst) % self.complete_freq.load(Ordering::SeqCst) == 0 && vuln.1 {
-                        Self::handle_vulnerability(vuln);
+                        self.handle_vulnerability(vuln);
                     } else {
-                        Self::handle_vulnerability(vuln);
+                        self.handle_vulnerability(vuln);
                     }
                 }
             },
             Err(g) => panic!("{}",g)
-        }
+        };
+
         self.in_execution.store(false, Ordering::SeqCst);
     }
 
