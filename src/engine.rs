@@ -22,7 +22,7 @@
 //!                 std::io::BufReader::new(file.clone()).read_line(&mut string);
 //! 
 //!                 if string == "Hello World" {
-//!                     e.add_score_entry(0, 50, "Wrote Hello World.".to_string());
+//!                     e.add_score_entry(0, 50, "Wrote Hello World.");
 //!                     true
 //!                 } else {
 //!                     false
@@ -232,18 +232,18 @@ impl Engine {
     /// 
     /// Adds an entry to the score report, with an ID, a score value, and an explanation.
     /// If an entry exists with the same ID, it instead changes the score and explanation
-    pub fn add_score(&mut self, id: u64, add: i32, reason: String) {
+    pub fn add_score<T: ToString>(&mut self, id: u64, add: i32, reason: T) {
         match self.score.lock() {
             Ok(mut g) => { 
                 for s in g.iter_mut() {
                     if s.0 == id {
                         s.1 = add;
-                        s.2 = reason;
+                        s.2 = reason.to_string();
                         return;
                     }
                 }
 
-                g.push((id, add, reason));
+                g.push((id, add, reason.to_string()));
             },
             Err(g) => panic!("{}", g),
         }
