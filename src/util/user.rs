@@ -402,7 +402,6 @@ pub fn user_is_in_group<A: ToString, B: ToString>(u: &A, g: &B) -> Result<bool, 
 /// If it returns an [`Ok`] value, the user exists and the payload contians if the user has admin privileges
 /// If it returns an [`Err`] value, the user does not exist
 pub fn user_is_admin<T: ToString>(name: &T) -> Result<bool, i32> {
-
     #[cfg(target_os = "linux")]
     {
         if name.to_string() == "root" {

@@ -4,10 +4,11 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-//! The Engine Structure itself
+//! # The Engine Structure itself
 //! 
 //! This is the main module of this library.
-//! It contains the [`Engine`] type, and some supporting structs and enums, [`AppData`], and [`InstallMethod`].
+//! It contains the [`Engine`] type, and some supporting structs and enums, 
+//! [`AppData`], and [`InstallMethod`].
 //! 
 //! ## Examples
 //! 
@@ -92,6 +93,15 @@ pub(crate) enum Condition {
     CustomVuln(Box<dyn FnMut(&mut Engine) -> bool + Send + Sync>),
 }
 
+/// Actual scoring engines.
+/// 
+/// The actual scoring engine that forms the core of the library.
+/// It handles scoring management, and execution of special closures called vulnerabilities used to
+/// detect vulnerabilities and score an engine.
+/// 
+/// All vulnerabilities start with a single argument, which is a mutable reference to an engine.
+/// Vulnerabilities return a bool, which indicates if it is complete or not, 
+/// and thus how often to re-execute it.
 pub struct Engine {
     is_running: AtomicBool,
     score: Arc<Mutex<Vec<(u64, i32, String)>>>,

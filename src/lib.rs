@@ -4,13 +4,13 @@
 *   Copyright (C) 2023 Teresa Maria Rivera
 */
 
-//! A cyberpatriots scoring engine library
+//! # A cyberpatriots scoring engine library
 //! 
 //! Provides a fairly simple interface for programming Cyberpatriots scoring engines for practice images. 
 //! It provides many core facilities useful for writing a scoring engine, 
 //! such as a simple system to handle vulnerabilities, a scoring report, 
-//! and some optional facilities for handling a database of configuration files, 
-//! or providing utilities for users, groups and packages.
+//! and some optional facilities for [providing utility functions for handling
+//! users, groups and packages in a somewhat cross platform manner][util].
 //! 
 //! ## Examples
 //! 
